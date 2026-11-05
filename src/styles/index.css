@@ -1,0 +1,23 @@
+@import './tokens.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-bg text-fg font-sans antialiased; margin: 0; overflow-x: hidden; }
+  h1, h2, h3, h4 { @apply font-display uppercase font-bold tracking-wide; }
+  *:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; border-radius: 6px; }
+  ::selection { background: rgb(var(--gold-300) / .35); }
+  input, select, textarea { font: inherit; }
+}
+
+@layer components {
+  .card { @apply bg-surface border border-border rounded-xl; }
+  .label { @apply block text-xs font-semibold uppercase tracking-wider text-muted mb-1; }
+  .field { @apply w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-fg placeholder:text-muted/70 focus:border-gold-300 focus:outline-none focus-visible:outline-2; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium; }
+  .demo-badge { @apply chip border-orange/50 text-orange bg-orange/10 uppercase tracking-wider; }
+  .text-gold { color: rgb(var(--gold-text)); }
+  .on-gold { color: rgb(var(--on-gold)); }
+}
