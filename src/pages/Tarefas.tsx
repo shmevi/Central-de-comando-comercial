@@ -97,7 +97,7 @@ export default function Tarefas() {
             ))}
           </ul>
         ) : (
-          <div className="-mx-4 overflow-x-auto px-4 pb-2">
+          <div className="relative -mx-4 overflow-x-auto px-4 pb-2">
             <div className="grid min-w-[880px] grid-cols-4 gap-3">
               {COLUMNS.map((col) => {
                 const items = filtered.filter((t) => t.status === col);

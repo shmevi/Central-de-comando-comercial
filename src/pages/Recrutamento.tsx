@@ -78,7 +78,7 @@ export default function Recrutamento() {
             <input id="busca-cand" type="search" className="field pl-9" placeholder="Buscar candidato…" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           {candidates.items.length === 0 ? <EmptyState title="Nenhum candidato" description="Cadastre os candidatos de vendas recebidos para iniciar a triagem." action={<Button onClick={() => setNewC(true)}><Plus size={16} />Candidato</Button>} /> : (
-            <div className="-mx-4 overflow-x-auto px-4 pb-2">
+            <div className="relative -mx-4 overflow-x-auto px-4 pb-2">
               <div className="grid min-w-[1680px] grid-cols-8 gap-3">
                 {STAGES.map((s) => {
                   const items = cs.filter((c) => c.stage === s.value);

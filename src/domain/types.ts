@@ -9,6 +9,8 @@ export interface BaseEntity {
   updated_at: string;
   /** true quando o registro é fictício (demonstração). Nunca apresentar como real. */
   is_demo?: boolean;
+  /** Referência externa (ex.: notion:<page_id>) para evitar duplicidade na importação. */
+  external_ref?: string | null;
 }
 
 export type InstitutionCode = 'CPPEM' | 'UNICIVE' | 'COLEGIO_CPPEM';

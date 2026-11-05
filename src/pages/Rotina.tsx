@@ -155,7 +155,7 @@ function WeekView({ date, onPick }: { date: string; onPick: (d: string) => void 
   const days = weekDates(date, 5);
   if (blocks.loading || !blocks.loaded) return <Loading />;
   return (
-    <div className="-mx-4 overflow-x-auto px-4">
+    <div className="relative -mx-4 overflow-x-auto px-4">
       <div className="grid min-w-[760px] grid-cols-5 gap-3">
         {days.map((d) => {
           const list = blocks.items.filter((b) => b.date === d).sort((a, b) => a.start.localeCompare(b.start));

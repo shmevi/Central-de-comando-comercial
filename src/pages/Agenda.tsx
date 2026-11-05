@@ -135,7 +135,7 @@ export default function Agenda() {
           )}
         </Card>
       ) : view === 'semana' ? (
-        <div className="-mx-4 overflow-x-auto px-4 pb-2">
+        <div className="relative -mx-4 overflow-x-auto px-4 pb-2">
           <div className="grid min-w-[980px] grid-cols-7 gap-2">
             {weekDates(date).map((d) => (
               <section key={d} className={cn('card flex min-h-[260px] flex-col p-2', d === now.date && 'border-gold-300', isWeekend(d) && 'opacity-70')} aria-label={fmtLongDate(d)}>
@@ -150,7 +150,7 @@ export default function Agenda() {
           </div>
         </div>
       ) : (
-        <div className="-mx-4 overflow-x-auto px-4">
+        <div className="relative -mx-4 overflow-x-auto px-4">
           <div className="grid min-w-[700px] grid-cols-7 gap-1">
             {WEEKDAYS_SHORT.slice(1).concat('Dom').map((w) => <div key={w} className="p-1 text-center text-xs font-semibold uppercase text-muted">{w}</div>)}
             {monthGrid(date).map((d) => {
