@@ -11,7 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { IMPROVEMENT_STAGES } from '@/domain/labels';
 import type { Improvement, ImprovementStage, SystemItem } from '@/domain/types';
 import { fmtDate, todayISO } from '@/lib/time';
-import { cn } from '@/lib/utils';
+import { cn, safeHttpUrl } from '@/lib/utils';
 
 function SystemDialog({ open, onOpenChange, item }: { open: boolean; onOpenChange: (o: boolean) => void; item: SystemItem | null }) {
   const toast = useToast();
@@ -22,7 +22,7 @@ function SystemDialog({ open, onOpenChange, item }: { open: boolean; onOpenChang
   async function save() {
     const e: Record<string, string> = {};
     if (!d.name.trim()) e.name = 'Informe o nome.';
-    if (d.url && !/^https?:\/\//.test(d.url)) e.url = 'Use um endereço iniciando com http:// ou https://';
+    if (d.url && !safeHttpUrl(d.url)) e.url = 'Use um endereço válido iniciando com http:// ou https://';
     setErr(e); if (Object.keys(e).length) return;
     try { item ? await actions.update('systems', item.id, d) : await actions.create('systems', d); toast('Sistema salvo.'); onOpenChange(false); } catch (er) { toast((er as Error).message, 'erro'); }
   }
@@ -129,7 +129,7 @@ export default function Sistemas() {
               <li key={s.id}><Card className="p-4">
                 <div className="flex items-start justify-between">
                   <div><div className="font-semibold">{s.name} {s.is_demo && <DemoBadge />}</div><div className="text-xs text-muted">{s.status === 'ativo' ? 'Ativo' : s.status === 'em_avaliacao' ? 'Em avaliação' : 'Descontinuado'}{s.owner && ` · ${s.owner}`}</div></div>
-                  <div className="flex">{s.url && <Button asChild variant="ghost" size="icon"><a href={s.url} target="_blank" rel="noreferrer noopener" aria-label={`Abrir ${s.name}`}><ExternalLink size={15} /></a></Button>}
+                  <div className="flex">{safeHttpUrl(s.url) && <Button asChild variant="ghost" size="icon"><a href={safeHttpUrl(s.url)!} target="_blank" rel="noreferrer noopener" aria-label={`Abrir ${s.name}`}><ExternalLink size={15} /></a></Button>}
                     <Button variant="ghost" size="icon" aria-label={`Editar ${s.name}`} onClick={() => setEditS(s)}><Pencil size={15} /></Button>
                     <Button variant="ghost" size="icon" aria-label={`Excluir ${s.name}`} onClick={async () => { if (await confirm({ title: 'Excluir sistema', message: `Excluir “${s.name}” do inventário? (Isto não altera o sistema real.)`, danger: true, confirmLabel: 'Excluir' })) actions.remove('systems', s.id); }}><Trash2 size={15} /></Button></div>
                 </div>

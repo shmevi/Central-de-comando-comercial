@@ -10,6 +10,7 @@ import { actions } from '@/data/store';
 import { useSettings } from '@/app/hooks';
 import { useToast } from '@/components/ui/toast';
 import { emptyTask, withHistory } from './taskLogic';
+import { setTaskStatus } from './actions';
 import { fmtDateTime } from '@/lib/time';
 import { uid } from '@/lib/utils';
 
@@ -37,11 +38,12 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
     setSaving(true);
     try {
       if (task) {
-        const changed = (['title', 'status', 'priority', 'due_date', 'institution_id'] as const).filter((k) => (task as any)[k] !== (d as any)[k]);
-        await actions.update('tasks', task.id, { ...d, title: d.title.trim(), history: changed.length ? withHistory(task, 'Editada', `Campos: ${changed.join(', ')}`) : task.history });
+        const changed = (['title', 'priority', 'due_date', 'institution_id', 'recurrence'] as const).filter((k) => (task as any)[k] !== (d as any)[k]);
+        const { status, completed_at: _c, ...fields } = d;
+        await setTaskStatus(task, status, { ...fields, title: d.title.trim(), history: changed.length ? withHistory(task, 'Editada', `Campos: ${changed.join(', ')}`) : task.history });
         toast('Tarefa atualizada.');
       } else {
-        await actions.create('tasks', { ...d, title: d.title.trim(), history: withHistory({ history: [] }, 'Criada') });
+        await actions.create('tasks', { ...d, title: d.title.trim(), completed_at: d.status === 'concluida' ? new Date().toISOString() : null, history: withHistory({ history: [] }, 'Criada') });
         toast('Tarefa criada.');
       }
       onOpenChange(false);

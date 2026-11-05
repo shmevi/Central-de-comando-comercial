@@ -12,9 +12,10 @@ import { repo, DATA_MODE } from '@/data';
 import { localClearAll } from '@/data/localRepository';
 import { seedDemo, removeDemo } from '@/data/seed';
 import { COLLECTIONS, type RoutineTemplateBlock } from '@/domain/types';
-import { effectiveMinutes } from '@/lib/workday';
+import { effectiveMinutes, validateWorkday } from '@/lib/workday';
 import { fmtDuration, toMin, WEEKDAYS } from '@/lib/time';
 import { uid } from '@/lib/utils';
+import { hashPin } from '@/lib/pin';
 import { download } from '@/features/reports/build';
 
 function Section({ title, children, description }: { title: string; description?: string; children: React.ReactNode }) {
@@ -85,14 +86,70 @@ function RoutineTemplateEditor() {
   );
 }
 
+function PinField() {
+  const { settings, save } = useSettings();
+  const toast = useToast();
+  const [pin, setPin] = React.useState('');
+  const [err, setErr] = React.useState<string | null>(null);
+  const has = !!settings.permissions.feedback_pin;
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!/^\d{4,8}$/.test(pin)) return setErr('Use de 4 a 8 dígitos.');
+    setErr(null);
+    await save({ permissions: { ...settings.permissions, feedback_pin: await hashPin(pin) } });
+    setPin(''); toast('PIN salvo (apenas o hash é armazenado).');
+  }
+  return (
+    <form onSubmit={submit} className="space-y-2">
+      <TextField label={has ? 'Trocar PIN dos feedbacks' : 'Definir PIN dos feedbacks'} type="password" inputMode="numeric" autoComplete="new-password" value={pin} onChange={(e) => setPin(e.target.value)} error={err}
+        hint="Camada extra na interface. A proteção real dos dados é a autenticação + RLS." />
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" variant="secondary">Salvar PIN</Button>
+        {has && <Button size="sm" variant="ghost" onClick={() => save({ permissions: { ...settings.permissions, feedback_pin: '' } })}>Remover PIN</Button>}
+      </div>
+    </form>
+  );
+}
+
+function WorkdaySection() {
+  const { settings, save } = useSettings();
+  const toast = useToast();
+  const [w, setW] = React.useState({ start: settings.workday_start, end: settings.workday_end, break_start: settings.break_start, break_end: settings.break_end });
+  React.useEffect(() => { setW({ start: settings.workday_start, end: settings.workday_end, break_start: settings.break_start, break_end: settings.break_end }); }, [settings.workday_start, settings.workday_end, settings.break_start, settings.break_end]);
+  const error = validateWorkday(w);
+  const eff = error ? null : effectiveMinutes(w);
+  const dirty = w.start !== settings.workday_start || w.end !== settings.workday_end || w.break_start !== settings.break_start || w.break_end !== settings.break_end;
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); if (error) return;
+    try { await save({ workday_start: w.start, workday_end: w.end, break_start: w.break_start, break_end: w.break_end, daily_minutes: eff!, weekly_minutes: eff! * 5 }); toast('Jornada salva.'); }
+    catch (er) { toast((er as Error).message, 'erro'); }
+  }
+  return (
+    <Section title="Jornada" description="Segunda a sexta. Sem expediente aos sábados e domingos.">
+      <form onSubmit={submit} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Início" type="time" required value={w.start} onChange={(e) => setW({ ...w, start: e.target.value })} />
+          <TextField label="Fim" type="time" required value={w.end} onChange={(e) => setW({ ...w, end: e.target.value })} />
+          <TextField label="Início do intervalo" type="time" required value={w.break_start} onChange={(e) => setW({ ...w, break_start: e.target.value })} />
+          <TextField label="Fim do intervalo" type="time" required value={w.break_end} onChange={(e) => setW({ ...w, break_end: e.target.value })} />
+        </div>
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : (
+          <p className="text-sm">Carga efetiva: <strong className="text-gold">{fmtDuration(eff!)}</strong> por dia ({eff} min) · <strong className="text-gold">{fmtDuration(eff! * 5)}</strong> por semana{eff !== 528 && <span className="text-orange"> — difere do padrão 8h48</span>}</p>
+        )}
+        <p className="text-xs text-muted">O bloco de intervalo do modelo de rotina não muda sozinho: ajuste-o em “Modelo de rotina” se mudar o intervalo.</p>
+        <Button type="submit" size="sm" disabled={!!error || !dirty}>Salvar jornada</Button>
+      </form>
+    </Section>
+  );
+}
+
 export default function Configuracoes() {
-  const { settings, save, workday } = useSettings();
+  const { settings, save } = useSettings();
   const { email, mode } = useAuth();
   const toast = useToast();
   const { confirm, confirmNode } = useConfirm();
   const [cat, setCat] = React.useState('');
   const fileRef = React.useRef<HTMLInputElement>(null);
-  const eff = effectiveMinutes(workday);
 
   async function exportBackup() {
     const out: Record<string, unknown> = { exported_at: new Date().toISOString(), version: 1 };
@@ -101,16 +158,25 @@ export default function Configuracoes() {
   }
   async function importBackup(file: File) {
     try {
-      const data = JSON.parse(await file.text());
-      if (data.version !== 1) throw new Error('Arquivo de backup inválido.');
+      if (file.size > 20 * 1024 * 1024) throw new Error('Arquivo grande demais (máx. 20 MB).');
+      let data: any;
+      try { data = JSON.parse(await file.text()); } catch { throw new Error('O arquivo não é um JSON válido.'); }
+      if (!data || typeof data !== 'object' || data.version !== 1) throw new Error('Arquivo de backup inválido (versão não reconhecida).');
       if (!(await confirm({ title: 'Importar backup', message: 'Os registros do arquivo serão ADICIONADOS aos atuais (registros com o mesmo ID são ignorados). Continuar?', confirmLabel: 'Importar' }))) return;
-      let n = 0;
+      let n = 0, skipped = 0;
+      const isRecord = (x: unknown): x is Record<string, unknown> & { id: string } =>
+        !!x && typeof x === 'object' && !Array.isArray(x) && typeof (x as any).id === 'string' && (x as any).id.length > 0 && (x as any).id.length <= 64;
       for (const c of COLLECTIONS) {
         if (c === 'settings' || !Array.isArray(data[c])) continue;
         const ids = new Set((await repo(c).list()).map((x) => x.id));
-        for (const item of data[c]) { if (!ids.has(item.id)) { const { created_at: _a, updated_at: _b, user_id: _u, ...rest } = item; await repo(c).create(rest); n++; } }
+        for (const item of data[c]) {
+          if (!isRecord(item)) { skipped++; continue; }
+          if (ids.has(item.id)) continue;
+          const { created_at: _a, updated_at: _b, user_id: _u, ...rest } = item;
+          await repo(c).create(rest as any); n++;
+        }
       }
-      resetStore(); toast(`${n} registro(s) importado(s).`);
+      resetStore(); toast(`${n} registro(s) importado(s)${skipped ? `, ${skipped} inválido(s) ignorado(s)` : ''}.`);
     } catch (e) { toast((e as Error).message, 'erro'); }
   }
 
@@ -124,15 +190,7 @@ export default function Configuracoes() {
             <Segmented label="Tema" value={settings.theme} onChange={(v) => save({ theme: v })} options={[{ value: 'dark', label: 'Escuro' }, { value: 'light', label: 'Claro' }, { value: 'system', label: 'Sistema' }]} /></div>
         </Section>
 
-        <Section title="Jornada" description="Segunda a sexta. Sem expediente aos sábados e domingos.">
-          <div className="grid grid-cols-2 gap-3">
-            <TextField label="Início" type="time" value={settings.workday_start} onChange={(e) => save({ workday_start: e.target.value })} />
-            <TextField label="Fim" type="time" value={settings.workday_end} onChange={(e) => save({ workday_end: e.target.value })} />
-            <TextField label="Início do intervalo" type="time" value={settings.break_start} onChange={(e) => save({ break_start: e.target.value })} />
-            <TextField label="Fim do intervalo" type="time" value={settings.break_end} onChange={(e) => save({ break_end: e.target.value })} />
-          </div>
-          <p className="text-sm">Carga efetiva: <strong className="text-gold">{fmtDuration(eff)}</strong> por dia ({eff} min) · <strong className="text-gold">{fmtDuration(eff * 5)}</strong> por semana{eff !== 528 && <span className="text-orange"> — difere do padrão 8h48</span>}</p>
-        </Section>
+        <WorkdaySection />
 
         <Institutions />
 
@@ -157,8 +215,7 @@ export default function Configuracoes() {
         <Section title="Usuários e permissões" description="Cada usuário só acessa os próprios dados (RLS no Supabase).">
           <p className="text-sm">Modo de persistência: <strong>{mode === 'supabase' ? 'Supabase (autenticado)' : 'Local — somente neste navegador'}</strong>{email && <> · {email}</>}</p>
           <Checkbox label="Restringir acesso aos feedbacks" checked={settings.permissions.feedbacks_restricted} onChange={(v) => save({ permissions: { ...settings.permissions, feedbacks_restricted: v } })} />
-          <TextField label="PIN para abrir feedbacks" type="password" inputMode="numeric" defaultValue={settings.permissions.feedback_pin} hint="Camada extra na interface. A proteção real dos dados é a autenticação + RLS."
-            onBlur={(e) => save({ permissions: { ...settings.permissions, feedback_pin: e.target.value } })} />
+          <PinField />
         </Section>
 
         <Section title="Dados" description="Dados de demonstração são marcados e podem ser removidos a qualquer momento.">

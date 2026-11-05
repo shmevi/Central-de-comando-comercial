@@ -21,6 +21,9 @@ export async function load<C extends Collection>(c: C, force = false) {
   try { set(c, { items: await repo(c).list(), loading: false, loaded: true }); }
   catch (e) { set(c, { loading: false, loaded: true, error: (e as Error).message }); }
 }
+/** Leitura síncrona do que já está carregado em memória. */
+export function getItems<C extends Collection>(c: C): EntityMap[C][] { return get(c).items; }
+
 export function resetStore() { [...states.keys()].forEach((c) => set(c, { items: [], loaded: false, loading: false, error: null })); }
 
 export const actions = {
@@ -48,7 +51,8 @@ export function useCollection<C extends Collection>(c: C) {
     return () => listeners.get(c)!.delete(l);
   }, [c]);
   const state = useSyncExternalStore(subscribe, () => get(c));
-  useEffect(() => { load(c); }, [c]);
+  // Recarrega sempre que a coleção não estiver carregada (inclusive após resetStore, ex.: importar backup).
+  useEffect(() => { if (!state.loaded) load(c); }, [c, state.loaded]);
   return {
     ...state,
     create: (input: any) => actions.create(c, input),

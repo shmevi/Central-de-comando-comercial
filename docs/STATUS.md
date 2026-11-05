@@ -18,9 +18,12 @@
   "Demonstração", removíveis com um clique. Por padrão o app inicia **sem** dados fictícios.
 
 ## Limitações conhecidas / próximos passos
-- O PIN de feedbacks é uma barreira de interface; a proteção real é login + RLS. Perfis com papéis diferentes
+- O PIN de feedbacks é uma barreira de interface (guardado como hash SHA-256, mas um PIN curto é fácil de adivinhar
+  por força bruta); a proteção real é login + RLS. Perfis com papéis diferentes
   (ex.: supervisor que lê só a própria equipe) exigem tabela de membros/papéis — ainda não modelado.
 - Multiusuário compartilhando os mesmos dados (equipe) não está modelado: cada usuário tem seu próprio espaço.
+- Se você apagar todos os blocos de rotina de hoje, a tela Hoje gera a rotina-base de novo ao abrir.
+- Mudar o horário do intervalo em Configurações não altera o bloco "Intervalo" do modelo de rotina: ajuste os dois.
 - Arrastar e soltar nos Kanbans usa HTML5 drag (desktop); no celular e por teclado use o seletor "Mover".
 - Adaptador Notion real via MCP: implementar `NotionAdapter` com `kind: 'mcp'` (somente leitura primeiro).
 - Os arquivos anexos citados no pedido (`prompt-central-comando-comercial.md` e `0001_central_comando.sql`) não

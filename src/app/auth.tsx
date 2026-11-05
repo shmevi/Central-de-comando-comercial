@@ -22,9 +22,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (DATA_MODE === 'local') { setEmail(null); boot(); return; }
     const sb = supabase();
-    sb.auth.getSession().then(({ data }) => {
+    sb.auth.getSession().then(({ data, error }) => {
+      if (error) { setError(error.message); setStatus('error'); return; }
       if (data.session) { setEmail(data.session.user.email ?? null); boot(); } else setStatus('signed_out');
-    });
+    }).catch((e) => { setError((e as Error).message); setStatus('error'); });
     const { data: sub } = sb.auth.onAuthStateChange((_ev, session) => {
       if (!session) { resetStore(); setEmail(null); setStatus('signed_out'); }
     });

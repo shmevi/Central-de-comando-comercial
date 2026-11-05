@@ -31,7 +31,7 @@ function Gate() {
   if (status === 'signed_out') return <Login />;
   return (
     <ScopeProvider>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<Loading />}>{/* fallback só para o primeiro carregamento; as telas têm Suspense dentro do AppShell */}
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<Hoje />} />

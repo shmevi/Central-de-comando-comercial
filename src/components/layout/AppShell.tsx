@@ -8,6 +8,8 @@ import { useScope } from '@/app/scope';
 import { useInstitutions, useSettings } from '@/app/hooks';
 import { useAuth } from '@/app/auth';
 import { Button } from '@/components/ui/button';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { Loading } from '@/components/ui/misc';
 
 function Brand() {
   return (
@@ -117,7 +119,9 @@ export function AppShell() {
           <div className="flex items-center gap-1"><ScopeSelect /><ThemeToggle /></div>
         </header>
         <main id="conteudo" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-5 lg:px-8 lg:pb-10">
-          <Outlet />
+          <ErrorBoundary resetKey={loc.pathname}>
+            <React.Suspense fallback={<Loading />}><Outlet /></React.Suspense>
+          </ErrorBoundary>
         </main>
         <nav aria-label="Atalhos" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-surface/95 backdrop-blur lg:hidden">
           {NAV.filter((n) => MOBILE_TABS.includes(n.to)).map(({ to, label, icon: Icon }) => (

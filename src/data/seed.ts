@@ -45,7 +45,7 @@ export async function seedDemo() {
 }
 
 export async function removeDemo() {
-  const cols = ['people', 'feedbacks', 'candidates', 'interviews', 'objectives', 'systems', 'tasks', 'projects', 'meetings', 'trainings', 'improvements', 'agenda_events'] as const;
+  const cols = ['people', 'feedbacks', 'candidates', 'interviews', 'objectives', 'systems', 'tasks', 'projects', 'meetings', 'trainings', 'improvements', 'agenda_events', 'review_queue'] as const;
   for (const c of cols) {
     await load(c);
     const items = await repo(c).list();

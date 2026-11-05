@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionSelect } from '@/components/domain/Institution';
 import { useToast } from '@/components/ui/toast';
-import { actions, useCollection } from '@/data/store';
+import { actions, getItems, useCollection } from '@/data/store';
 import { ATTENDANCE, STAGES, STAGE_LABEL, toOptions } from '@/domain/labels';
 import type { Candidate, Interview } from '@/domain/types';
 import { addDays, fmtDate, todayISO, toMin } from '@/lib/time';
@@ -92,17 +92,20 @@ export function InterviewDialog({ open, onOpenChange, interview, candidateId }: 
     if (d.score != null && (d.score < 0 || d.score > 10)) e.score = 'Nota de 0 a 10.';
     setErr(e); if (Object.keys(e).length) return;
     const payload = { ...d, institution_id: cand?.institution_id ?? null };
+    // Lê o candidato atual do store a cada passo, para não sobrescrever o histórico com uma cópia antiga.
+    const current = () => getItems('candidates').find((c) => c.id === d.candidate_id);
+    const moveTo = async (stage: Candidate['stage'], action: string, detail?: string) => {
+      const c = current(); if (!c || c.stage === stage) return;
+      await actions.update('candidates', c.id, { stage, history: [...c.history, { at: nowIso(), action, detail }] });
+    };
     try {
       if (interview) await actions.update('interviews', interview.id, payload);
       else {
         await actions.create('interviews', payload);
-        if (cand && ['recebido', 'triagem', 'selecionado'].includes(cand.stage))
-          await actions.update('candidates', cand.id, { stage: 'entrevista_agendada', history: [...cand.history, { at: nowIso(), action: 'Entrevista agendada', detail: fmtDate(d.date) }] });
+        if (cand && ['recebido', 'triagem', 'selecionado'].includes(cand.stage)) await moveTo('entrevista_agendada', 'Entrevista agendada', fmtDate(d.date));
       }
-      if (cand && d.decision !== 'pendente' && cand.stage !== d.decision)
-        await actions.update('candidates', cand.id, { stage: d.decision, history: [...cand.history, { at: nowIso(), action: 'Decisão registrada', detail: STAGE_LABEL[d.decision] }] });
-      else if (cand && d.attendance === 'compareceu' && cand.stage === 'entrevista_agendada')
-        await actions.update('candidates', cand.id, { stage: 'entrevistado', history: [...cand.history, { at: nowIso(), action: 'Entrevistado' }] });
+      if (d.decision !== 'pendente') await moveTo(d.decision, 'Decisão registrada', STAGE_LABEL[d.decision]);
+      else if (d.attendance === 'compareceu' && current()?.stage === 'entrevista_agendada') await moveTo('entrevistado', 'Entrevistado');
       toast('Entrevista salva.'); onOpenChange(false);
     } catch (er) { toast((er as Error).message, 'erro'); }
   }

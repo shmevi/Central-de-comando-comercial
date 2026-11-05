@@ -14,7 +14,6 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
         <D.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" />
         <D.Content
           className={cn('fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-32px)] max-h-[calc(100dvh-32px)] flex flex-col card shadow-2xl', wide ? 'max-w-3xl' : 'max-w-lg')}
-          aria-describedby={description ? undefined : undefined}
         >
           <div className="flex items-start justify-between gap-4 border-b border-border p-4">
             <div>

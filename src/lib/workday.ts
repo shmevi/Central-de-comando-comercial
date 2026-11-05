@@ -43,3 +43,12 @@ export const STATUS_LABEL: Record<WorkdayStatus, string> = {
 export function hitsBreak(start: string, end: string, w: Workday = DEFAULT_WORKDAY): boolean {
   return toMin(start) < toMin(w.break_end) && toMin(w.break_start) < toMin(end);
 }
+
+/** Valida a jornada: início < início do intervalo < fim do intervalo < fim. Retorna a mensagem de erro ou null. */
+export function validateWorkday(w: Workday): string | null {
+  const re = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (![w.start, w.end, w.break_start, w.break_end].every((t) => re.test(t))) return 'Preencha todos os horários (HH:mm).';
+  if (!(toMin(w.start) < toMin(w.break_start) && toMin(w.break_start) < toMin(w.break_end) && toMin(w.break_end) < toMin(w.end)))
+    return 'A ordem deve ser: início < início do intervalo < fim do intervalo < fim.';
+  return null;
+}

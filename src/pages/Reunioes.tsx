@@ -37,6 +37,7 @@ function MeetingDialog({ open, onOpenChange, meeting }: { open: boolean; onOpenC
   async function save() {
     const e: Record<string, string> = {};
     if (!d.title.trim()) e.title = 'Informe o título.';
+    if (!d.date) e.date = 'Informe a data.';
     if (!d.start || !d.end || toMin(d.end) <= toMin(d.start)) e.time = 'Horário inválido.';
     if (d.actions.some((a) => !a.owner.trim())) e.actions = 'Todo encaminhamento precisa de responsável.';
     setErr(e); if (Object.keys(e).length) return;
@@ -56,7 +57,7 @@ function MeetingDialog({ open, onOpenChange, meeting }: { open: boolean; onOpenC
         {!meeting && <SelectField className="sm:col-span-2" label="Modelo" value={d.template} onChange={(e) => applyTpl(e.target.value)} options={Object.entries(TPL_LABEL).map(([value, label]) => ({ value, label }))} />}
         <TextField className="sm:col-span-2" label="Título" required value={d.title} onChange={(e) => set('title', e.target.value)} error={err.title} />
         <InstitutionSelect value={d.institution_id} onChange={(v) => set('institution_id', v)} />
-        <TextField label="Data" type="date" value={d.date} onChange={(e) => set('date', e.target.value)} />
+        <TextField label="Data" type="date" required value={d.date} onChange={(e) => set('date', e.target.value)} error={err.date} />
         <TextField label="Início" type="time" value={d.start} onChange={(e) => set('start', e.target.value)} error={err.time} />
         <TextField label="Fim" type="time" value={d.end} onChange={(e) => set('end', e.target.value)} />
         {conflicts.length > 0 && <p role="alert" className="sm:col-span-2 flex items-center gap-2 text-sm text-danger"><AlertTriangle size={14} />Conflita com: {conflicts.map((c) => `${c.title} (${c.start})`).join(', ')}</p>}

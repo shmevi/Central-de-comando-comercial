@@ -19,7 +19,7 @@ npm run dev                  # http://localhost:5173
 | `npm run build` | checagem de tipos + build de produção em `dist/` |
 | `npm run preview` | serve o build |
 | `npm test` | testes unitários (Vitest) |
-| `npm run test:e2e` | teste de fumaça no navegador (Playwright) — requer `npm run dev` ativo |
+| `npm run test:e2e` | teste de fumaça no navegador (Playwright) — requer `npm run dev` ativo e, na primeira vez, `npx playwright install chromium` |
 | `npm run test:rls` | aplica a migration num PostgreSQL local descartável e testa RLS/integridade |
 
 ### Modos de persistência
@@ -35,11 +35,32 @@ npm run dev                  # http://localhost:5173
 VITE_SUPABASE_URL=https://<seu-projeto>.supabase.co
 VITE_SUPABASE_ANON_KEY=<chave publicável / anon>
 VITE_DATA_MODE=supabase
+VITE_ALLOW_SIGNUP=          # deixe vazio em produção
 ```
 
 Somente a chave **publicável (anon)** vai no frontend. **Nunca** use a `service_role` aqui.
-Nenhum projeto Supabase foi conectado. Para ativar: crie um projeto **novo** (ou um que você indicar),
-aplique `supabase/migrations/0001_central_comando.sql` (SQL Editor ou `supabase db push`) e preencha o `.env.local`.
+
+## Colocar em produção (Supabase + hospedagem)
+
+Nenhum projeto Supabase foi conectado até agora. Passo a passo:
+
+1. **Criar o projeto** no Supabase (um projeto **novo**, região São Paulo de preferência).
+2. **Aplicar o esquema**: SQL Editor → colar e executar `supabase/migrations/0001_central_comando.sql`
+   (ou `supabase link` + `supabase db push`).
+3. **Fechar o cadastro público**: Authentication → Sign In / Providers → desativar *Allow new users to sign up*.
+4. **Criar o seu usuário**: Authentication → Users → *Add user* (e-mail e senha forte).
+5. **Conferir a segurança**: Advisors → Security Advisor sem alertas de RLS.
+6. **Configurar o app**: copiar *Project URL* e a chave *publishable/anon* (Project Settings → API) para o `.env.local`
+   (ou para as variáveis de ambiente da hospedagem) com `VITE_DATA_MODE=supabase`.
+7. **Publicar**: `npm run build` gera `dist/`. Em Vercel/Netlify: comando `npm run build`, pasta `dist`,
+   as mesmas variáveis `VITE_*`, e redirecionar todas as rotas para `index.html` (SPA).
+8. **Primeiro acesso**: entrar com o usuário criado. O app cria sozinho as instituições, a rotina-base e as tarefas iniciais.
+9. **Migrar dados locais (opcional)**: no modo local, Configurações → *Exportar backup*; no modo Supabase, *Importar backup*.
+
+## Verificações automáticas (GitHub Actions)
+
+`.github/workflows/ci.yml` roda em cada pull request: checagem de tipos, testes unitários, build,
+`npm audit` das dependências de produção, migration + RLS num PostgreSQL descartável e o teste de fumaça no Chromium.
 
 ## Estrutura
 

@@ -12,6 +12,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setItems((i) => [...i, { id, message, kind }]);
     setTimeout(() => setItems((i) => i.filter((t) => t.id !== id)), 4000);
   }, []);
+  // Rede de segurança: qualquer falha de gravação não tratada vira um aviso visível em vez de sumir.
+  React.useEffect(() => {
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const msg = e.reason instanceof Error ? e.reason.message : String(e.reason ?? 'Erro desconhecido');
+      push(`Não foi possível concluir a ação: ${msg}`, 'erro');
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => window.removeEventListener('unhandledrejection', onRejection);
+  }, [push]);
   return (
     <Ctx.Provider value={push}>
       {children}

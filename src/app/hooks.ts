@@ -15,7 +15,11 @@ export function useSettings() {
   const c = useCollection('settings');
   const settings: Settings = (c.items[0] ?? { ...DEFAULT_SETTINGS, id: '', created_at: '', updated_at: '' }) as Settings;
   const workday: Workday = { start: settings.workday_start, end: settings.workday_end, break_start: settings.break_start, break_end: settings.break_end };
-  const save = (patch: Partial<Settings>) => (c.items[0] ? c.update(c.items[0].id, patch) : c.create({ ...DEFAULT_SETTINGS, ...patch }));
+  // Só cria a linha de configurações depois de carregar — antes disso, criaria uma duplicata.
+  const save = async (patch: Partial<Settings>) => {
+    if (!c.loaded) throw new Error('Configurações ainda carregando. Tente novamente em instantes.');
+    return c.items[0] ? c.update(c.items[0].id, patch) : c.create({ ...DEFAULT_SETTINGS, ...patch });
+  };
   return { settings, workday, save, loading: c.loading, error: c.error };
 }
 

@@ -34,6 +34,8 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [A] Tarefas iniciais 04/11, 05/11 e 06/11/2026 presentes uma única vez, sem recorrência
 - [A] Validação de título; criar; concluir; busca; visão Kanban
 - [A] Recorrência diária pula fim de semana; semanal +7; mensal respeita último dia do mês
+- [A] Mover para "Concluída" pelo Kanban ou pelo formulário grava a data de conclusão (conta no relatório)
+- [A] Reabrir e concluir de novo não duplica a recorrência; concluir com atraso não gera ocorrência já vencida
 - [M] Checklist (adicionar, marcar, remover); histórico registra criação, edição e mudanças de status
 - [M] Filtros por status, prioridade, categoria e atalhos (hoje, atrasadas, missão)
 - [M] Arrastar entre colunas do Kanban ou usar o seletor "Mover"
@@ -69,14 +71,20 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 
 ## Integrações
 - [A] Leitura (demonstração) envia item sem instituição para a fila de revisão
+- [A] Reunião sem data vai para a revisão (nunca recebe a data de hoje); prazos em formato inválido são descartados
 - [M] Ativar leitura exige confirmação; escrita desativada por padrão e exige confirmação
 - [M] Revisar: atribuir instituição e importar, ou descartar; segunda sincronização não duplica; log registra tudo
 
 ## Configurações
+- [A] Jornada fora de ordem (ex.: intervalo depois do fim) é recusada
+- [A] PIN guardado só como hash; links de sistemas só http(s) (bloqueia `javascript:` vindo de backup)
 - [M] Alterar jornada recalcula carga efetiva; instituição com tarefas não pode ser excluída (só desativada)
 - [M] Carregar/remover demonstração; exportar/importar backup JSON; apagar dados locais pede confirmação
 
 ## Supabase (quando configurado)
+- [A] Feedback/entrevista/melhoria não podem apontar para pessoa/candidato/sistema de outro usuário (`npm run test:rls`)
+- [M] Listas com mais de 1000 registros carregam completas (leitura paginada)
+- [M] Sem `VITE_ALLOW_SIGNUP=true`, a tela de login não oferece "Criar conta"
 - [M] Aplicar a migration em projeto novo; criar conta; seed criado uma única vez por usuário
 - [A] Usuário B não vê nem altera dados de A, não forja `user_id`, não usa instituição de A; `anon` sem acesso (`npm run test:rls`)
 - [M] Rodar *Advisors* de segurança do Supabase sem alertas de RLS

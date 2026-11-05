@@ -4,6 +4,9 @@ import { Monogram } from '@/components/layout/Monogram';
 import { TextField } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 
+/** Cadastro aberto só se explicitamente habilitado. Desative também "Allow new users to sign up" no Supabase. */
+const ALLOW_SIGNUP = import.meta.env.VITE_ALLOW_SIGNUP === 'true';
+
 export default function Login() {
   const { signIn, signUp } = useAuth();
   const [email, setEmail] = React.useState('');
@@ -30,9 +33,11 @@ export default function Login() {
         <TextField label="Senha" type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} required />
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Aguarde…' : mode === 'in' ? 'Entrar' : 'Criar conta'}</Button>
-        <button type="button" className="w-full text-center text-xs text-muted hover:text-gold" onClick={() => setMode(mode === 'in' ? 'up' : 'in')}>
-          {mode === 'in' ? 'Primeiro acesso? Criar conta' : 'Já tenho conta'}
-        </button>
+        {ALLOW_SIGNUP ? (
+          <button type="button" className="w-full text-center text-xs text-muted hover:text-gold" onClick={() => setMode(mode === 'in' ? 'up' : 'in')}>
+            {mode === 'in' ? 'Primeiro acesso? Criar conta' : 'Já tenho conta'}
+          </button>
+        ) : <p className="text-center text-xs text-muted">Acesso somente para usuários cadastrados pelo administrador.</p>}
       </form>
     </div>
   );

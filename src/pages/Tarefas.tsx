@@ -11,8 +11,8 @@ import { useConfirm } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { TaskDialog } from '@/features/tasks/TaskDialog';
-import { isOpen, isOverdue, withHistory } from '@/features/tasks/taskLogic';
-import { toggleMission } from '@/features/tasks/actions';
+import { isOpen, isOverdue } from '@/features/tasks/taskLogic';
+import { setTaskStatus, toggleMission } from '@/features/tasks/actions';
 import { PRIORITY, TASK_STATUS, toOptions } from '@/domain/labels';
 import type { Task, TaskStatus } from '@/domain/types';
 import { todayISO, fmtDate } from '@/lib/time';
@@ -59,7 +59,7 @@ export default function Tarefas() {
   }
   async function move(id: string, s: TaskStatus) {
     const t = tasks.items.find((x) => x.id === id); if (!t || t.status === s) return;
-    await actions.update('tasks', id, { status: s, completed_at: s === 'concluida' ? new Date().toISOString() : null, history: withHistory(t, 'Status alterado', `${TASK_STATUS[t.status]} → ${TASK_STATUS[s]}`) });
+    try { await setTaskStatus(t, s); } catch (e) { toast((e as Error).message, 'erro'); }
   }
   const setQuick = (v: string) => { v ? setParams({ f: v }) : setParams({}); };
 

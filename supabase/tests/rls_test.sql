@@ -22,8 +22,28 @@ do $$ declare iid uuid; begin
   perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
   set local role authenticated;
   begin insert into tasks (title, institution_id) values ('Invasão', iid); raise exception 'FALHA: instituição de outro usuário aceita';
-  exception when raise_exception then if sqlerrm like 'FALHA%' then raise; end if; end;
+  exception when insufficient_privilege then null; end;
 end $$;
+-- FK para pessoa de outro usuário (feedback) também é recusada
+reset role;
+insert into people (user_id, name) values ('11111111-1111-1111-1111-111111111111', 'Pessoa A');
+do $$ declare pid uuid; begin
+  select id into pid from people where name = 'Pessoa A';
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  set local role authenticated;
+  begin insert into feedbacks (person_id, date) values (pid, '2026-11-05'); raise exception 'FALHA: feedback para pessoa de outro usuário aceito';
+  exception when insufficient_privilege then null; end;
+end $$;
+-- ...mas o dono consegue registrar feedback para a própria pessoa
+reset role;
+do $$ declare pid uuid; begin
+  select id into pid from people where name = 'Pessoa A';
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  set local role authenticated;
+  insert into feedbacks (person_id, date) values (pid, '2026-11-05');
+end $$;
+reset role;
+do $$ begin if (select count(*) from feedbacks) <> 1 then raise exception 'FALHA: dono não conseguiu registrar feedback'; end if; end $$;
 reset role;
 do $$ begin if (select title from tasks where user_id = '11111111-1111-1111-1111-111111111111') <> 'Tarefa A' then raise exception 'FALHA: B alterou tarefa de A'; end if; end $$;
 set role anon;

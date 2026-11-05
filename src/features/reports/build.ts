@@ -12,12 +12,13 @@ export function buildReport(dates: string[], data: Data, today: string, nowTime:
   const rows: Row[] = [];
   const past = dates.filter((d) => d <= today);
 
-  const blocks = data.routine_blocks.filter((b) => inRange(b.date) && !b.is_break && match(b.institution_id));
+  // A rotina é pessoal (não pertence a uma instituição): não é filtrada pelo escopo.
+  const blocks = data.routine_blocks.filter((b) => inRange(b.date) && !b.is_break);
   const generated = dates.filter((d) => data.routine_blocks.some((b) => b.date === d));
   const elapsed = blocks.filter((b) => b.date < today || (b.date === today && toMin(b.end) <= toMin(nowTime)));
   const unfilled = elapsed.filter((b) => b.status === 'planejado' || b.status === 'em_andamento');
   const doneMin = blocks.filter((b) => b.status === 'concluido').reduce((s, b) => s + toMin(b.end) - toMin(b.start), 0);
-  rows.push({ section: 'Rotina', indicator: 'Blocos planejados', value: generated.length ? blocks.length : null, note: generated.length ? undefined : 'Rotina não gerada no período' });
+  rows.push({ section: 'Rotina', indicator: 'Blocos planejados', value: generated.length ? blocks.length : null, note: generated.length ? 'Rotina pessoal — não filtrada por instituição' : 'Rotina não gerada no período' });
   rows.push({ section: 'Rotina', indicator: 'Blocos concluídos', value: generated.length ? blocks.filter((b) => b.status === 'concluido').length : null });
   rows.push({ section: 'Rotina', indicator: 'Blocos adiados', value: generated.length ? blocks.filter((b) => b.status === 'adiado').length : null });
   rows.push({ section: 'Rotina', indicator: 'Tempo concluído', value: generated.length ? fmtDuration(doneMin) : null });
@@ -59,8 +60,11 @@ export function weeklySeries(date: string, blocks: EntityMap['routine_blocks'][]
 
 export const displayValue = (v: Row['value']) => (v == null ? 'Não preenchido' : String(v));
 
+/** Evita injeção de fórmula ao abrir no Excel/Sheets (célula começando com = + - @ tab ou CR). */
+export const csvSafe = (s: string) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
+
 export function toCSV(rows: Row[], title: string): string {
-  const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  const esc = (s: string) => `"${csvSafe(s).replace(/"/g, '""')}"`;
   const lines = [[title], ['Seção', 'Indicador', 'Valor', 'Observação'], ...rows.map((r) => [r.section, r.indicator, displayValue(r.value), r.note ?? ''])];
   return '﻿' + lines.map((l) => l.map((c) => esc(String(c))).join(';')).join('\r\n');
 }

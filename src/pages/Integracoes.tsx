@@ -9,7 +9,7 @@ import { Checkbox, TextField } from '@/components/ui/form';
 import { InstitutionSelect } from '@/components/domain/Institution';
 import { useToast } from '@/components/ui/toast';
 import { mockNotionAdapter } from '@/integrations/notion/mockAdapter';
-import { importPage, syncRead } from '@/integrations/notion/sync';
+import { importPage, isoDate, resolveInstitution, syncRead } from '@/integrations/notion/sync';
 import type { NotionEntity } from '@/integrations/notion/adapter';
 import type { ReviewQueueItem } from '@/domain/types';
 import { fmtDateTime } from '@/lib/time';
@@ -24,11 +24,18 @@ const ENT_LABEL: Record<NotionEntity, string> = { tarefas: 'Tarefas', okrs: 'OKR
 
 function ReviewRow({ item }: { item: ReviewQueueItem }) {
   const { settings } = useSettings();
+  const { items: insts } = useInstitutions();
   const toast = useToast();
-  const [inst, setInst] = React.useState<string | null>(null);
+  const mapping = settings.notion_mapping[item.entity] ?? {};
+  const props = item.payload as Record<string, string | null>;
+  const [inst, setInst] = React.useState<string | null>(() => resolveInstitution(props[mapping.institution], insts));
+  const needsDate = item.entity === 'reunioes' && !isoDate(props[mapping.date]);
+  const [date, setDate] = React.useState('');
   async function approve() {
     if (!inst) return toast('Escolha a instituição antes de importar.', 'erro');
-    await importPage(item.entity, { id: item.external_id, properties: item.payload as any }, settings.notion_mapping[item.entity] ?? {}, inst, !!item.is_demo);
+    if (needsDate && !isoDate(date)) return toast('Informe a data da reunião antes de importar.', 'erro');
+    try { await importPage(item.entity, { id: item.external_id, properties: props }, mapping, inst, !!item.is_demo, needsDate ? { date } : {}); }
+    catch (e) { return toast((e as Error).message, 'erro'); }
     await actions.update('review_queue', item.id, { resolved: true, resolution: 'importado' });
     await actions.create('sync_logs', { source: 'notion', direction: 'leitura', entity: item.entity, status: 'sucesso', message: `Item revisado e importado: ${item.title}`, is_demo_source: !!item.is_demo });
     toast('Item importado com a instituição escolhida.');
@@ -38,9 +45,10 @@ function ReviewRow({ item }: { item: ReviewQueueItem }) {
     toast('Item descartado (nada foi alterado no Notion).');
   }
   return (
-    <li className="grid items-end gap-3 rounded-lg border border-border p-3 sm:grid-cols-[1fr_220px_auto]">
-      <div><div className="font-semibold">{item.title} {item.is_demo && <DemoBadge />}</div><div className="text-xs text-muted">{ENT_LABEL[item.entity]} · sem instituição reconhecida</div></div>
+    <li className={cn('grid items-end gap-3 rounded-lg border border-border p-3', needsDate ? 'sm:grid-cols-[1fr_200px_160px_auto]' : 'sm:grid-cols-[1fr_220px_auto]')}>
+      <div><div className="font-semibold">{item.title} {item.is_demo && <DemoBadge />}</div><div className="text-xs text-muted">{ENT_LABEL[item.entity]} · {item.reason || 'Sem instituição reconhecida'}</div></div>
       <InstitutionSelect label="Atribuir instituição" value={inst} onChange={setInst} />
+      {needsDate && <TextField label="Data da reunião" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />}
       <div className="flex gap-2"><Button size="sm" onClick={approve}>Importar</Button><Button size="sm" variant="ghost" onClick={discard}>Descartar</Button></div>
     </li>
   );

@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import type { Feedback, Person } from '@/domain/types';
 import { fmtDate, todayISO } from '@/lib/time';
 import { nowIso } from '@/lib/utils';
+import { checkPin } from '@/lib/pin';
 
 function PersonDialog({ open, onOpenChange, person }: { open: boolean; onOpenChange: (o: boolean) => void; person: Person | null }) {
   const toast = useToast();
@@ -58,6 +59,7 @@ function FeedbackDialog({ open, onOpenChange, feedback, personId }: { open: bool
   async function save() {
     const e: Record<string, string> = {};
     if (!d.person_id) e.person = 'Escolha a pessoa.';
+    if (!d.date) e.date = 'Informe a data do feedback.';
     if (!d.institution_id) e.inst = 'Escolha a instituição do feedback.';
     else if (person && !person.institution_ids.includes(d.institution_id)) e.inst = 'A pessoa não está vinculada a esta instituição.';
     if (!d.positives.trim() && !d.to_develop.trim()) e.positives = 'Preencha pontos positivos ou a desenvolver.';
@@ -73,7 +75,7 @@ function FeedbackDialog({ open, onOpenChange, feedback, personId }: { open: bool
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField label="Pessoa" required value={d.person_id} onChange={(e) => set('person_id', e.target.value)} error={err.person} options={people.items.map((p) => ({ value: p.id, label: p.name }))} placeholder="Selecione…" />
         <InstitutionSelect required value={d.institution_id} onChange={(v) => set('institution_id', v)} error={err.inst} />
-        <TextField label="Data" type="date" value={d.date} onChange={(e) => set('date', e.target.value)} />
+        <TextField label="Data" type="date" required value={d.date} onChange={(e) => set('date', e.target.value)} error={err.date} />
         <TextField label="Prazo do plano" type="date" value={d.deadline ?? ''} onChange={(e) => set('deadline', e.target.value || null)} error={err.deadline} />
         <TextArea label="Pontos positivos" value={d.positives} onChange={(e) => set('positives', e.target.value)} error={err.positives} />
         <TextArea label="A desenvolver" value={d.to_develop} onChange={(e) => set('to_develop', e.target.value)} />
@@ -104,7 +106,7 @@ function PinGate({ onUnlock }: { onUnlock: () => void }) {
   );
   return (
     <Card className="mx-auto max-w-sm p-6">
-      <form onSubmit={(e) => { e.preventDefault(); if (pin === settings.permissions.feedback_pin) onUnlock(); else setErr('PIN incorreto.'); }} className="space-y-3">
+      <form onSubmit={async (e) => { e.preventDefault(); if (await checkPin(pin, settings.permissions.feedback_pin)) onUnlock(); else setErr('PIN incorreto.'); }} className="space-y-3">
         <p className="flex items-center gap-2 font-display text-lg uppercase"><Lock size={18} className="text-gold" />Feedbacks restritos</p>
         <TextField label="PIN de acesso" type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} error={err} autoFocus />
         <Button type="submit" className="w-full">Desbloquear</Button>

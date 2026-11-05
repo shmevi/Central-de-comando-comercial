@@ -67,7 +67,7 @@ export default function Hoje() {
   const [creating, setCreating] = React.useState(false);
 
   const status = workdayStatus(now.date, now.time, workday);
-  const total = effectiveMinutes(workday);
+  const total = Math.max(1, effectiveMinutes(workday));
   const worked = workedMinutes(now.date, now.time, workday);
   const scoped = tasks.items.filter((t) => matches(t.institution_id));
   const mission = missionFor(scoped, now.date);

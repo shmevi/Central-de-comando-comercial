@@ -1,4 +1,5 @@
-import type { Task } from '@/domain/types';
+import type { Recurrence, Task, TaskStatus } from '@/domain/types';
+import { TASK_STATUS as TASK_STATUS_LABEL } from '@/domain/labels';
 import { addDays, isWeekend } from '@/lib/time';
 import { nowIso } from '@/lib/utils';
 
@@ -11,14 +12,35 @@ export function missionFor(tasks: Task[], date: string) {
   return tasks.filter((t) => t.is_mission && t.mission_date === date);
 }
 
-export function nextDueDate(t: Task): string | null {
-  if (!t.due_date || t.recurrence === 'nenhuma') return null;
-  if (t.recurrence === 'diaria') { let d = addDays(t.due_date, 1); while (isWeekend(d)) d = addDays(d, 1); return d; }
-  if (t.recurrence === 'semanal') return addDays(t.due_date, 7);
-  const [y, m, dd] = t.due_date.split('-').map(Number);
+function step(due: string, r: Recurrence, anchorDay: number): string {
+  if (r === 'diaria') { let d = addDays(due, 1); while (isWeekend(d)) d = addDays(d, 1); return d; }
+  if (r === 'semanal') return addDays(due, 7);
+  const [y, m] = due.split('-').map(Number);
   const nm = m === 12 ? 1 : m + 1, ny = m === 12 ? y + 1 : y;
   const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
-  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(dd, last)).padStart(2, '0')}`;
+  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(anchorDay, last)).padStart(2, '0')}`;
+}
+
+/**
+ * Próximo prazo de uma tarefa recorrente. Com `today`, avança até cair depois de hoje
+ * (concluir com atraso não gera uma ocorrência já vencida).
+ */
+export function nextDueDate(t: Pick<Task, 'due_date' | 'recurrence'>, today?: string): string | null {
+  if (!t.due_date || t.recurrence === 'nenhuma') return null;
+  const anchor = Number(t.due_date.slice(8, 10));
+  let d = step(t.due_date, t.recurrence, anchor);
+  while (today && d <= today) d = step(d, t.recurrence, anchor);
+  return d;
+}
+
+/** Campos que acompanham uma mudança de status (data de conclusão e histórico). */
+export function statusPatch(t: Task, status: TaskStatus): Partial<Task> {
+  if (t.status === status) return {};
+  return {
+    status,
+    completed_at: status === 'concluida' ? nowIso() : null,
+    history: withHistory(t, status === 'concluida' ? 'Concluída' : t.status === 'concluida' ? 'Reaberta' : 'Status alterado', `${TASK_STATUS_LABEL[t.status]} → ${TASK_STATUS_LABEL[status]}`),
+  };
 }
 
 export const withHistory = (t: Pick<Task, 'history'>, action: string, detail?: string) => [...(t.history ?? []), { at: nowIso(), action, detail }];

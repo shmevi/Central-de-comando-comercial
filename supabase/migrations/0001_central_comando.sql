@@ -231,6 +231,7 @@ create table public.review_queue (
   is_demo boolean not null default false, external_ref text,
   source text not null default 'notion', entity text not null check (entity in ('tarefas','okrs','reunioes')),
   external_id text not null, title text not null default '', payload jsonb not null default '{}',
+  reason text not null default '',
   resolved boolean not null default false, resolution text check (resolution in ('importado','descartado')),
   unique (user_id, source, external_id)
 );
@@ -264,13 +265,23 @@ create index interviews_date_idx on public.interviews (user_id, date);
 create index meetings_date_idx on public.meetings (user_id, date);
 create index agenda_events_date_idx on public.agenda_events (user_id, date);
 
--- Integridade entre instituições: a FK de instituição precisa pertencer ao mesmo usuário.
-create or replace function public.check_institution_owner() returns trigger
+-- Integridade entre usuários: toda chave estrangeira precisa apontar para um registro do MESMO usuário.
+-- (A checagem de FK do Postgres ignora o RLS; sem isto, quem soubesse um UUID alheio poderia referenciá-lo.)
+-- Uso: check_ref_owner('<coluna>', '<tabela referenciada>'). SECURITY INVOKER: o RLS da tabela referenciada também vale.
+create or replace function public.check_ref_owner() returns trigger
 language plpgsql set search_path = '' as $$
+declare
+  col text := tg_argv[0];
+  ref_table text := tg_argv[1];
+  ref_id uuid;
+  ok boolean;
 begin
-  if new.institution_id is not null and not exists (
-    select 1 from public.institutions i where i.id = new.institution_id and i.user_id = new.user_id) then
-    raise exception 'Instituição inválida para este usuário';
+  execute format('select ($1).%I', col) into ref_id using new;
+  if ref_id is null then return new; end if;
+  execute format('select exists (select 1 from public.%I r where r.id = $1 and r.user_id = $2)', ref_table)
+    into ok using ref_id, new.user_id;
+  if not ok then
+    raise exception 'Referência inválida para este usuário (%.%)', tg_table_name, col using errcode = '42501';
   end if;
   return new;
 end; $$;
@@ -281,6 +292,13 @@ begin
   foreach t in array array['tasks','routine_blocks','agenda_events','feedbacks','candidates','interviews','trainings',
     'meetings','improvements','objectives','projects']
   loop
-    execute format('create trigger %I before insert or update on public.%I for each row execute function public.check_institution_owner()', t || '_inst_owner', t);
+    execute format('create trigger %I before insert or update on public.%I for each row execute function public.check_ref_owner(%L, %L)', t || '_inst_owner', t, 'institution_id', 'institutions');
   end loop;
 end $$;
+
+create trigger feedbacks_person_owner before insert or update on public.feedbacks
+  for each row execute function public.check_ref_owner('person_id', 'people');
+create trigger interviews_candidate_owner before insert or update on public.interviews
+  for each row execute function public.check_ref_owner('candidate_id', 'candidates');
+create trigger improvements_system_owner before insert or update on public.improvements
+  for each row execute function public.check_ref_owner('system_id', 'systems');

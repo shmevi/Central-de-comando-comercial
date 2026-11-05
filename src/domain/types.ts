@@ -247,6 +247,8 @@ export interface ReviewQueueItem extends BaseEntity {
   external_id: string;
   title: string;
   payload: Record<string, unknown>;
+  /** Por que o item não foi importado direto (ex.: sem instituição, reunião sem data). */
+  reason: string;
   resolved: boolean;
   resolution: 'importado' | 'descartado' | null;
 }

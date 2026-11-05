@@ -3,6 +3,8 @@ const { chromium } = require('playwright');
 const BASE = process.argv[2] || 'http://localhost:5173';
 const ROUTES = ['/', '/rotina', '/agenda', '/tarefas', '/recrutamento', '/equipes', '/treinamentos', '/reunioes', '/sistemas', '/okrs', '/projetos', '/relatorios', '/integracoes', '/configuracoes'];
 let fails = 0;
+const recifeToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Recife' }).format(new Date());
+const isoMinusDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
 const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++; };
 
 (async () => {
@@ -46,10 +48,24 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   ok(await p.locator('li:has-text("Tarefa E2E")').count() >= 1 && await p.locator('text=Confirmar entrevistas').count() === 0, 'busca filtra');
   await p.fill('#busca', '');
 
-  // Kanban
+  // Kanban: mover para "Concluída" grava a conclusão (reaparece como "Reabrir" na lista)
   await p.click('role=radio[name="Kanban"]'); await p.waitForTimeout(200);
   ok(await p.locator('section[aria-label="Em andamento"]').count() === 1, 'kanban renderiza');
-  await p.click('role=radio[name="Lista"]');
+  await p.getByRole('combobox', { name: 'Mover Confirmar entrevistas e preparar avaliação para' }).selectOption('concluida');
+  await p.waitForTimeout(300);
+  await p.click('role=radio[name="Lista"]'); await p.waitForTimeout(200);
+  ok(await p.locator('input[aria-label="Reabrir Confirmar entrevistas e preparar avaliação"]').isChecked(), 'kanban → concluída marca a tarefa como concluída');
+
+  // Recorrência: concluir, reabrir e concluir de novo cria UMA próxima ocorrência
+  await p.click('button:has-text("Nova tarefa")');
+  await p.fill('role=dialog >> label:has-text("Título") >> xpath=following-sibling::input', 'Recorrente E2E');
+  await p.fill('role=dialog >> label:has-text("Prazo") >> xpath=following-sibling::input', isoMinusDays(recifeToday(), 10));
+  await p.getByRole('dialog').getByRole('combobox', { name: /^Recorrência/ }).selectOption('semanal');
+  await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
+  for (const label of ['Concluir', 'Reabrir', 'Concluir']) { await p.locator(`input[aria-label="${label} Recorrente E2E"]`).first().click(); await p.waitForTimeout(250); }
+  ok(await p.locator('li:has-text("Recorrente E2E")').count() === 2, 'recorrência não duplica ao reabrir e concluir de novo');
+  const dues = (await p.locator('li:has-text("Recorrente E2E")').allInnerTexts()).map((t) => /(\d{2})\/(\d{2})\/(\d{4})/.exec(t)).filter(Boolean).map((m) => `${m[3]}-${m[2]}-${m[1]}`);
+  ok(dues.some((d) => d > recifeToday()), `tarefa vencida há 10 dias, concluída hoje: próxima ocorrência cai depois de hoje (${dues.join(', ')})`);
 
   // Recrutamento
   await p.goto(BASE + '/recrutamento'); await p.click('button:has-text("Candidato")');
@@ -102,6 +118,7 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   await p.click('button:has-text("Sincronizar")'); await p.waitForTimeout(2500);
   await p.click('role=radio[name^="Revisão"]');
   ok(await p.locator('text=Item sem instituição definida').count() === 1, 'item sem instituição vai para fila de revisão');
+  ok(await p.locator('li:has-text("Reunião importada") >> text=Reunião sem data válida').count() === 1, 'reunião sem data vai para revisão (não recebe data inventada)');
 
   // Relatórios: exportar CSV
   await p.goto(BASE + '/relatorios'); await p.waitForSelector('text=Tarefas concluídas');

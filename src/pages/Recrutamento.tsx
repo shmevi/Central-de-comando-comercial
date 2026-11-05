@@ -34,7 +34,7 @@ export default function Recrutamento() {
   const byId = Object.fromEntries(candidates.items.map((c) => [c.id, c]));
   const ivs = interviews.items.filter((i) => matches(i.institution_id)).sort((a, b) => (a.date + (a.start || '99')).localeCompare(b.date + (b.start || '99')));
   const conflictSet = conflictingIds(ivs.filter((i) => i.start && i.end));
-  const expired = candidates.items.filter((c) => c.retention_until && c.retention_until < today);
+  const expired = candidates.items.filter((c) => matches(c.institution_id) && c.retention_until && c.retention_until < today);
 
   async function moveStage(id: string, stage: CandidateStage) {
     const c = byId[id]; if (!c || c.stage === stage) return;
@@ -50,7 +50,15 @@ export default function Recrutamento() {
   async function delI(i: Interview) {
     if (await confirm({ title: 'Excluir entrevista', message: 'Excluir esta entrevista?', danger: true, confirmLabel: 'Excluir' })) await actions.remove('interviews', i.id);
   }
-  async function setAttendance(i: Interview, a: Interview['attendance']) { await actions.update('interviews', i.id, { attendance: a }); toast('Presença atualizada.'); }
+  async function setAttendance(i: Interview, a: Interview['attendance']) {
+    try {
+      await actions.update('interviews', i.id, { attendance: a });
+      const c = byId[i.candidate_id];
+      if (a === 'compareceu' && c?.stage === 'entrevista_agendada')
+        await actions.update('candidates', c.id, { stage: 'entrevistado', history: [...c.history, { at: nowIso(), action: 'Entrevistado' }] });
+      toast('Presença atualizada.');
+    } catch (e) { toast((e as Error).message, 'erro'); }
+  }
 
   const loading = candidates.loading || interviews.loading;
   const error = candidates.error || interviews.error;
