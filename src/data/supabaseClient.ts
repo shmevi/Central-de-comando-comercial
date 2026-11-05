@@ -1,17 +1,23 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { resolveDataConfig } from './config';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-const mode = (import.meta.env.VITE_DATA_MODE as string | undefined) ?? (url && anon ? 'supabase' : 'local');
-
+export const DATA_CONFIG = resolveDataConfig(import.meta.env as unknown as Record<string, string | undefined>);
 /** Somente a chave publicável (anon). A service_role NUNCA deve estar no frontend. */
-export const DATA_MODE: 'local' | 'supabase' = mode === 'supabase' && url && anon ? 'supabase' : 'local';
+export const DATA_MODE = DATA_CONFIG.mode;
+
+/**
+ * Tipo do link de e-mail que abriu o app (convite ou recuperação de senha), lido ANTES de o
+ * supabase-js consumir o hash da URL. Nesses casos o usuário precisa definir uma senha.
+ */
+export const AUTH_LINK_TYPE: string | null = (() => {
+  try { return new URLSearchParams(window.location.hash.slice(1)).get('type'); } catch { return null; }
+})();
 
 let client: SupabaseClient | null = null;
 export function supabase(): SupabaseClient {
   if (!client) {
-    if (!url || !anon) throw new Error('Supabase não configurado (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).');
-    client = createClient(url, anon, { auth: { persistSession: true, autoRefreshToken: true } });
+    if (DATA_CONFIG.error || !DATA_CONFIG.url || !DATA_CONFIG.key) throw new Error(DATA_CONFIG.error ?? 'Supabase não configurado.');
+    client = createClient(DATA_CONFIG.url, DATA_CONFIG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
   }
   return client;
 }

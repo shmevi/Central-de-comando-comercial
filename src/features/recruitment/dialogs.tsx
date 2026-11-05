@@ -2,6 +2,7 @@ import * as React from 'react';
 import { AlertTriangle, Copy, ShieldCheck } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionSelect } from '@/components/domain/Institution';
 import { useToast } from '@/components/ui/toast';
@@ -18,11 +19,8 @@ type CDraft = Omit<Candidate, 'id' | 'created_at' | 'updated_at'>;
 const emptyCandidate = (): CDraft => ({ name: '', phone: '', email: '', position: 'Consultor(a) de vendas', institution_id: null, stage: 'recebido', source: '', notes: '', consent_lgpd: false, consent_at: null, retention_until: null, history: [] });
 
 export function CandidateDialog({ open, onOpenChange, candidate }: { open: boolean; onOpenChange: (o: boolean) => void; candidate: Candidate | null }) {
-  const [d, setD] = React.useState<CDraft>(emptyCandidate());
-  const [err, setErr] = React.useState<Record<string, string>>({});
+  const { d, set, err, setErr } = useDraft(open, () => candidate ? { ...candidate } : emptyCandidate(), [candidate]);
   const toast = useToast();
-  React.useEffect(() => { if (open) { setD(candidate ? { ...candidate } : emptyCandidate()); setErr({}); } }, [open, candidate]);
-  const set = <K extends keyof CDraft>(k: K, v: CDraft[K]) => setD((p) => ({ ...p, [k]: v }));
   async function save() {
     const e: Record<string, string> = {};
     if (!d.name.trim()) e.name = 'Informe o nome.';
@@ -71,10 +69,7 @@ export function InterviewDialog({ open, onOpenChange, interview, candidateId }: 
   const meetings = useCollection('meetings');
   const toast = useToast();
   const empty = (): IDraft => ({ candidate_id: candidateId ?? '', institution_id: null, date: '', start: '', end: '', location: '', interviewer: '', attendance: 'pendente', time_confirmed: false, evaluation: '', score: null, decision: 'pendente' });
-  const [d, setD] = React.useState<IDraft>(empty());
-  const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(interview ? { ...interview } : empty()); setErr({}); } }, [open, interview, candidateId]); // eslint-disable-line
-  const set = <K extends keyof IDraft>(k: K, v: IDraft[K]) => setD((p) => ({ ...p, [k]: v }));
+  const { d, set, err, setErr } = useDraft(open, () => interview ? { ...interview } : empty(), [interview, candidateId]);
   const cand = candidates.items.find((c) => c.id === d.candidate_id);
 
   const conflicts = d.date && d.start && d.end && toMin(d.end) > toMin(d.start) ? [

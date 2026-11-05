@@ -57,6 +57,12 @@ export function addDays(iso: string, n: number): string {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+/** Primeiro dia do mês deslocado em `n` meses (ex.: 2026-11-20, -1 → 2026-10-01). */
+export function shiftMonth(iso: string, n: number): string {
+  const [y, m] = iso.split('-').map(Number);
+  const t = y * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}-01`;
+}
 export function weekdayOf(iso: string): number {
   return new Date(`${iso}T12:00:00Z`).getUTCDay();
 }

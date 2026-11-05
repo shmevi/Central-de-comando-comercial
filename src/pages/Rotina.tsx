@@ -1,12 +1,14 @@
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, Coffee, Lock, Pencil, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Coffee, Lock, Pencil, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { useCollection, actions } from '@/data/store';
 import { useNow, useSettings } from '@/app/hooks';
 import { PageHeader, Segmented, Loading, ErrorState, EmptyState, Card, Progress } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { useToast } from '@/components/ui/toast';
+import { DateNav } from '@/components/ui/date-nav';
 import { InstitutionSelect } from '@/components/domain/Institution';
 import { BLOCK_STATUS, toOptions } from '@/domain/labels';
 import type { BlockStatus, RoutineBlock } from '@/domain/types';
@@ -33,10 +35,7 @@ function BlockDialog({ open, onOpenChange, block, date, workday }: { open: boole
   const { settings } = useSettings();
   const toast = useToast();
   const empty: Draft = { date, start: '', end: '', title: '', category: 'Geral', status: 'planejado', notes: '', is_break: false, break_exception: false, break_exception_reason: '', institution_id: null };
-  const [d, setD] = React.useState<Draft>(empty);
-  const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(block ? { ...block } : empty); setErr({}); } }, [open, block]); // eslint-disable-line
-  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
+  const { d, set, err, setErr } = useDraft(open, () => block ? { ...block } : empty, [block]);
   const needsException = !d.is_break && d.start && d.end && hitsBreak(d.start, d.end, workday);
   async function save() {
     const e = validate(d, workday); setErr(e); if (Object.keys(e).length) return;
@@ -193,12 +192,7 @@ export default function Rotina() {
     <div>
       <PageHeader title="Minha Rotina" subtitle={view === 'dia' ? fmtLongDate(date) : `Semana de ${fmtDate(weekDates(date)[0])}`}
         actions={<Segmented label="Visão" value={view} onChange={setView} options={[{ value: 'dia', label: 'Dia' }, { value: 'semana', label: 'Semana' }]} />} />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="icon" aria-label="Anterior" onClick={() => setDate(addDays(date, -step))}><ChevronLeft size={18} /></Button>
-        <Button variant="secondary" size="sm" onClick={() => setDate(now.date)}>Hoje</Button>
-        <Button variant="ghost" size="icon" aria-label="Próximo" onClick={() => setDate(addDays(date, step))}><ChevronRight size={18} /></Button>
-        <label className="ml-auto"><span className="sr-only">Escolher data</span><input type="date" className="field h-9 w-auto" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} /></label>
-      </div>
+      <DateNav date={date} today={now.date} onChange={setDate} onPrev={() => setDate(addDays(date, -step))} onNext={() => setDate(addDays(date, step))} />
       {view === 'dia' ? <DayView key={date} date={date} workday={workday} nowTime={now.time} isToday={date === now.date} />
         : <WeekView date={date} onPick={(d) => { setDate(d); setView('dia'); }} />}
     </div>

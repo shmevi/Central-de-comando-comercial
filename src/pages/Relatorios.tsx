@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, FileDown, FileSpreadsheet } from 'lucide-react';
+import { FileDown, FileSpreadsheet } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useCollection } from '@/data/store';
 import { useNow } from '@/app/hooks';
@@ -8,6 +8,7 @@ import { useInstitutions } from '@/app/hooks';
 import { PageHeader, Segmented, Loading, Card } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
+import { DateNav } from '@/components/ui/date-nav';
 import { addDays, fmtDate, fmtLongDate, weekDates } from '@/lib/time';
 import { buildReport, displayValue, download, toCSV, toPDF, weeklySeries } from '@/features/reports/build';
 import { cn } from '@/lib/utils';
@@ -39,13 +40,9 @@ export default function Relatorios() {
           <Button variant="secondary" disabled={loading} onClick={() => { download(`${fileBase}.csv`, toCSV(rows, `${title} · ${period} · ${scopeLabel}`), 'text/csv;charset=utf-8'); toast('CSV exportado.'); }}><FileSpreadsheet size={16} />CSV</Button>
           <Button disabled={loading} onClick={() => toPDF(rows, title, `${period} · ${scopeLabel} · gerado em ${fmtDate(now.date)} ${now.time}`, `${fileBase}.pdf`).then(() => toast('PDF exportado.')).catch((e) => toast(e.message, 'erro'))}><FileDown size={16} />PDF</Button>
         </>} />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="icon" aria-label="Período anterior" onClick={() => setDate(addDays(date, kind === 'diario' ? -1 : -7))}><ChevronLeft size={18} /></Button>
-        <Button variant="secondary" size="sm" onClick={() => setDate(now.date)}>Hoje</Button>
-        <Button variant="ghost" size="icon" aria-label="Próximo período" onClick={() => setDate(addDays(date, kind === 'diario' ? 1 : 7))}><ChevronRight size={18} /></Button>
-        <label><span className="sr-only">Data de referência</span><input type="date" className="field h-9 w-auto" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} /></label>
+      <DateNav date={date} today={now.date} onChange={setDate} onPrev={() => setDate(addDays(date, kind === 'diario' ? -1 : -7))} onNext={() => setDate(addDays(date, kind === 'diario' ? 1 : 7))}>
         <span className="text-xs text-muted">{kind === 'diario' && fmtLongDate(date)}</span>
-      </div>
+      </DateNav>
       <p className="mb-4 rounded-lg border border-orange/40 bg-orange/5 p-3 text-xs"><strong className="text-orange">Não preenchido</strong> indica ausência de registro e não é o mesmo que zero.</p>
       {loading ? <Loading /> : (
         <div className="grid gap-5 lg:grid-cols-[1fr_380px] [&>*]:min-w-0">

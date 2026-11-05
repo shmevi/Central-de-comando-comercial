@@ -1,4 +1,4 @@
-import { CalendarClock, Star } from 'lucide-react';
+import { CalendarClock, Star, Trash2 } from 'lucide-react';
 import type { Task } from '@/domain/types';
 import { PRIORITY, TASK_STATUS } from '@/domain/labels';
 import { InstitutionBadge } from '@/components/domain/Institution';
@@ -9,7 +9,7 @@ import { isOverdue } from './taskLogic';
 import { toggleComplete } from './actions';
 import { useToast } from '@/components/ui/toast';
 
-export function TaskRow({ task, onOpen, onMission, compact }: { task: Task; onOpen: (t: Task) => void; onMission?: (t: Task) => void; compact?: boolean }) {
+export function TaskRow({ task, onOpen, onMission, onDelete, compact }: { task: Task; onOpen: (t: Task) => void; onMission?: (t: Task) => void; onDelete?: (t: Task) => void; compact?: boolean }) {
   const toast = useToast();
   const today = todayISO();
   const done = task.status === 'concluida';
@@ -35,6 +35,11 @@ export function TaskRow({ task, onOpen, onMission, compact }: { task: Task; onOp
         <button type="button" onClick={() => onMission(task)} aria-pressed={inMission} aria-label={inMission ? 'Remover da missão do dia' : 'Adicionar à missão do dia'}
           className={cn('rounded-lg p-1.5', inMission ? 'text-gold' : 'text-muted hover:text-gold')}>
           <Star size={18} fill={inMission ? 'currentColor' : 'none'} />
+        </button>
+      )}
+      {onDelete && (
+        <button type="button" onClick={() => onDelete(task)} aria-label={`Excluir ${task.title}`} className="rounded-lg p-1.5 text-muted hover:text-danger">
+          <Trash2 size={16} />
         </button>
       )}
     </li>

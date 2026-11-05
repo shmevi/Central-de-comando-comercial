@@ -4,6 +4,7 @@ import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { PageHeader, Loading, ErrorState, EmptyState, Card, DemoBadge, Progress } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionBadge, InstitutionSelect } from '@/components/domain/Institution';
@@ -17,10 +18,7 @@ function TrainingDialog({ open, onOpenChange, training }: { open: boolean; onOpe
   const people = useCollection('people');
   const toast = useToast();
   const empty = (): Omit<Training, 'id' | 'created_at' | 'updated_at'> => ({ title: '', track: 'atendimento', institution_id: null, date: null, duration_min: 60, description: '', attendees: [] });
-  const [d, setD] = React.useState(empty());
-  const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(training ? { ...training } : empty()); setErr({}); } }, [open, training]);
-  const set = (k: string, v: any) => setD((p) => ({ ...p, [k]: v }));
+  const { d, set, err, setErr } = useDraft(open, () => training ? { ...training } : empty(), [training]);
   const eligible = people.items.filter((p) => p.active && (!d.institution_id || p.institution_ids.includes(d.institution_id)));
   const att = (id: string) => d.attendees.find((a) => a.person_id === id);
   async function save() {
@@ -68,7 +66,7 @@ function TrainingDialog({ open, onOpenChange, training }: { open: boolean; onOpe
 export default function Treinamentos() {
   const trainings = useCollection('trainings');
   const { matches } = useScope();
-  const { confirm, confirmNode } = useConfirm();
+  const { confirmDelete, confirmNode } = useConfirm();
   const [track, setTrack] = React.useState('');
   const [editing, setEditing] = React.useState<Training | null>(null); const [creating, setCreating] = React.useState(false);
   const list = trainings.items.filter((t) => matches(t.institution_id)).filter((t) => !track || t.track === track).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
@@ -96,7 +94,7 @@ export default function Treinamentos() {
                   <div><div className="font-semibold">{t.title} {t.is_demo && <DemoBadge />}</div>
                     <div className="flex flex-wrap gap-1 text-xs text-muted"><span className="chip border-gold-300/50 text-gold">{TRACKS.find((x) => x.value === t.track)?.label}</span><InstitutionBadge id={t.institution_id} />{fmtDate(t.date)} · {t.duration_min} min</div></div>
                   <div className="flex"><Button variant="ghost" size="icon" aria-label={`Editar ${t.title}`} onClick={() => setEditing(t)}><Pencil size={15} /></Button>
-                    <Button variant="ghost" size="icon" aria-label={`Excluir ${t.title}`} onClick={async () => { if (await confirm({ title: 'Excluir treinamento', message: `Excluir “${t.title}”?`, danger: true, confirmLabel: 'Excluir' })) actions.remove('trainings', t.id); }}><Trash2 size={15} /></Button></div>
+                    <Button variant="ghost" size="icon" aria-label={`Excluir ${t.title}`} onClick={() => confirmDelete('Excluir treinamento', `“${t.title}”`, () => actions.remove('trainings', t.id))}><Trash2 size={15} /></Button></div>
                 </div>
                 <p className="mt-2 text-sm">Presença: <strong>{present}/{t.attendees.length}</strong> · Nota média: <strong>{scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : 'não avaliado'}</strong></p>
               </Card></li>

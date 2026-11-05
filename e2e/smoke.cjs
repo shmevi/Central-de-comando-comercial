@@ -12,6 +12,9 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   const ctx = await b.newContext({ viewport: { width: 1366, height: 900 }, acceptDownloads: true });
   const p = await ctx.newPage();
   const errors = []; p.on('pageerror', (e) => errors.push(e.message)); p.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  // Qualquer violação da Content-Security-Policy aparece como erro de console e reprova o teste.
+  const csp = (await (await fetch(BASE + '/')).headers.get('content-security-policy')) || '';
+  console.log(csp ? '• rodando com Content-Security-Policy de produção' : '• rodando sem CSP (servidor de desenvolvimento)');
   await p.goto(BASE); await p.waitForSelector('text=Missão do dia');
 
   // Dados iniciais
@@ -137,6 +140,10 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
       if (sw > 0) console.log(await p.evaluate(() => { const out = []; document.querySelectorAll('body *').forEach((e) => { const rc = e.getBoundingClientRect(); if (rc.right > innerWidth + 1) { let c = e, clipped = false; while ((c = c.parentElement)) { if (getComputedStyle(c).overflowX !== 'visible') { clipped = true; break; } } if (!clipped) out.push(`${e.tagName}.${String(e.className).slice(0, 60)} → ${Math.round(rc.right)}`); } }); return out.slice(0, 6); }));
     }
   }
+  // Rota interna aberta direto (como um link salvo) funciona: fallback de SPA
+  await p.goto(BASE + '/relatorios'); await p.waitForTimeout(500);
+  ok(await p.locator('h1:has-text("Relatórios")').count() === 1, 'abrir /relatorios direto funciona (sem 404)');
+
   // Teclado: link "pular para o conteúdo"
   await p.goto(BASE); await p.waitForSelector('text=Missão do dia'); await p.keyboard.press('Tab');
   ok(await p.evaluate(() => document.activeElement?.textContent?.includes('Pular')), 'primeiro Tab foca "Pular para o conteúdo"');

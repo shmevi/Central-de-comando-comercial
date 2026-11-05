@@ -24,7 +24,16 @@ export async function load<C extends Collection>(c: C, force = false) {
 /** Leitura síncrona do que já está carregado em memória. */
 export function getItems<C extends Collection>(c: C): EntityMap[C][] { return get(c).items; }
 
-export function resetStore() { [...states.keys()].forEach((c) => set(c, { items: [], loaded: false, loading: false, error: null })); }
+/**
+ * Limpa o cache. `notify=true` faz as telas abertas recarregarem (ex.: depois de importar um backup).
+ * Ao sair da conta use `notify=false`: as telas estão sendo fechadas e não devem pedir dados sem login.
+ */
+export function resetStore(notify = true) {
+  for (const c of [...states.keys()]) {
+    states.set(c, { items: [], loaded: false, loading: false, error: null });
+    if (notify) listeners.get(c)?.forEach((l) => l());
+  }
+}
 
 export const actions = {
   async create<C extends Collection>(c: C, input: any): Promise<EntityMap[C]> {

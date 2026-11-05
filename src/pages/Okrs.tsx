@@ -4,6 +4,7 @@ import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { PageHeader, Loading, ErrorState, EmptyState, Card, DemoBadge, Progress } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import { SelectField, TextField } from '@/components/ui/form';
 import { InstitutionBadge, InstitutionSelect } from '@/components/domain/Institution';
@@ -19,9 +20,7 @@ const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.'))
 function ObjectiveDialog({ open, onOpenChange, item }: { open: boolean; onOpenChange: (o: boolean) => void; item: Objective | null }) {
   const toast = useToast();
   const empty = (): Omit<Objective, 'id' | 'created_at' | 'updated_at'> => ({ title: '', institution_id: null, cycle: currentCycle(), owner: '', key_results: [] });
-  const [d, setD] = React.useState(empty()); const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(item ? { ...item } : empty()); setErr({}); } }, [open, item]);
-  const set = (k: string, v: any) => setD((p) => ({ ...p, [k]: v }));
+  const { d, set, err, setErr } = useDraft(open, () => item ? { ...item } : empty(), [item]);
   const setKr = (id: string, patch: Partial<KeyResult>) => set('key_results', d.key_results.map((k) => (k.id === id ? { ...k, ...patch } : k)));
   async function save() {
     const e: Record<string, string> = {};
@@ -68,7 +67,7 @@ function ObjectiveDialog({ open, onOpenChange, item }: { open: boolean; onOpenCh
 export default function Okrs() {
   const objectives = useCollection('objectives');
   const { matches } = useScope();
-  const { confirm, confirmNode } = useConfirm();
+  const { confirmDelete, confirmNode } = useConfirm();
   const [cycle, setCycle] = React.useState('');
   const [editing, setEditing] = React.useState<Objective | null>(null); const [creating, setCreating] = React.useState(false);
   const cycles = [...new Set(objectives.items.map((o) => o.cycle))].sort().reverse();
@@ -87,7 +86,7 @@ export default function Okrs() {
                 <div className="flex items-start justify-between gap-2">
                   <div><div className="font-semibold">{o.title} {o.is_demo && <DemoBadge />}</div><div className="flex flex-wrap gap-1 text-xs text-muted"><InstitutionBadge id={o.institution_id} /><span className="chip border-border">{o.cycle}</span>{o.owner && <span>{o.owner}</span>}</div></div>
                   <div className="flex"><Button variant="ghost" size="icon" aria-label={`Editar ${o.title}`} onClick={() => setEditing(o)}><Pencil size={15} /></Button>
-                    <Button variant="ghost" size="icon" aria-label={`Excluir ${o.title}`} onClick={async () => { if (await confirm({ title: 'Excluir objetivo', message: `Excluir “${o.title}”?`, danger: true, confirmLabel: 'Excluir' })) actions.remove('objectives', o.id); }}><Trash2 size={15} /></Button></div>
+                    <Button variant="ghost" size="icon" aria-label={`Excluir ${o.title}`} onClick={() => confirmDelete('Excluir objetivo', `“${o.title}”`, () => actions.remove('objectives', o.id))}><Trash2 size={15} /></Button></div>
                 </div>
                 <div className="mt-3">
                   <div className="mb-1 flex justify-between text-xs"><span className="text-muted">Progresso</span><span className="text-gold">{p == null ? 'Sem meta válida' : `${p}%`}</span></div>

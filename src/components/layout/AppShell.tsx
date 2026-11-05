@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LogOut, Menu, Moon, Sun, X } from 'lucide-react';
+import { HardDrive, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
 import { NAV, MOBILE_TABS } from '@/app/nav';
 import { Monogram } from './Monogram';
 import { cn } from '@/lib/utils';
@@ -52,7 +52,7 @@ function ScopeSelect() {
   return (
     <label className="flex items-center gap-2 text-xs">
       <span className="sr-only sm:not-sr-only text-muted uppercase tracking-wider font-semibold">Instituição</span>
-      <select value={scope} onChange={(e) => setScope(e.target.value)} className="field h-9 w-auto py-1 pr-8" aria-label="Filtrar por instituição">
+      <select value={scope} onChange={(e) => setScope(e.target.value)} className="field h-9 w-auto max-w-[9.5rem] py-1 pr-8 sm:max-w-none" aria-label="Filtrar por instituição">
         <option value="all">Todas</option>
         {active.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
         <option value="none">Sem instituição</option>
@@ -115,7 +115,14 @@ export function AppShell() {
             <Button variant="ghost" size="icon" aria-label="Abrir menu" onClick={() => setOpen(true)}><Menu size={20} /></Button>
             <Monogram size={30} />
           </div>
-          <div className="hidden text-xs text-muted lg:block">Fuso: America/Recife</div>
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <span className="hidden lg:inline">Fuso: America/Recife</span>
+            {mode === 'local' && (
+              <span className="chip border-orange/50 text-orange" title="Modo local: os dados ficam salvos apenas neste navegador. Exporte backups em Configurações.">
+                <HardDrive size={12} aria-hidden /><span className="hidden sm:inline">Dados só neste navegador</span><span className="sr-only sm:hidden">Dados só neste navegador</span>
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1"><ScopeSelect /><ThemeToggle /></div>
         </header>
         <main id="conteudo" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-5 lg:px-8 lg:pb-10">

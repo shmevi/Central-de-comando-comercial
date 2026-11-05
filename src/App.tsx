@@ -6,7 +6,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { AppShell } from '@/components/layout/AppShell';
 import { ErrorState, Loading } from '@/components/ui/misc';
 import Hoje from '@/pages/Hoje';
-import Login from '@/pages/Login';
+import Login, { ConfigError, SetPassword } from '@/pages/Login';
 
 const Rotina = lazy(() => import('@/pages/Rotina'));
 const Agenda = lazy(() => import('@/pages/Agenda'));
@@ -27,6 +27,8 @@ function NotFound() { return <ErrorState message="Página não encontrada." />; 
 function Gate() {
   const { status, error } = useAuth();
   if (status === 'loading') return <Loading label="Preparando a central…" />;
+  if (status === 'config_error') return <ConfigError message={error ?? ''} />;
+  if (status === 'set_password') return <SetPassword />;
   if (status === 'error') return <div className="p-4"><ErrorState message={`Não foi possível iniciar: ${error}`} onRetry={() => location.reload()} /></div>;
   if (status === 'signed_out') return <Login />;
   return (

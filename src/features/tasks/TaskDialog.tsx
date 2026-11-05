@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionSelect } from '@/components/domain/Institution';
 import { PRIORITY, RECURRENCE, TASK_STATUS, toOptions } from '@/domain/labels';
@@ -17,16 +18,11 @@ import { uid } from '@/lib/utils';
 type Draft = Omit<Task, 'id' | 'created_at' | 'updated_at'> & { id?: string };
 
 export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boolean; onOpenChange: (o: boolean) => void; task?: Task | null; defaults?: Partial<Task> }) {
-  const [d, setD] = React.useState<Draft>(emptyTask());
-  const [err, setErr] = React.useState<Record<string, string>>({});
+  const { d, set, err, setErr } = useDraft<Draft>(open, () => (task ? { ...task } : { ...emptyTask(), ...defaults }), [task]);
   const [saving, setSaving] = React.useState(false);
   const [newItem, setNewItem] = React.useState('');
   const { settings } = useSettings();
   const toast = useToast();
-
-  React.useEffect(() => { if (open) { setD(task ? { ...task } : { ...emptyTask(), ...defaults }); setErr({}); } }, [open, task]); // eslint-disable-line
-
-  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
 
   async function save(e?: React.FormEvent) {
     e?.preventDefault();

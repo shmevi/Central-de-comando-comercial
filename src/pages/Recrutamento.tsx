@@ -1,10 +1,12 @@
 import * as React from 'react';
-import { CalendarPlus, MessageCircle, Pencil, Plus, Search, ShieldAlert, Trash2 } from 'lucide-react';
+import { CalendarPlus, MessageCircle, Pencil, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { PageHeader, Segmented, Loading, ErrorState, EmptyState, Card, DemoBadge } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/dialog';
+import { SearchInput } from '@/components/ui/search';
+import { KanbanBoard } from '@/components/ui/kanban';
 import { useToast } from '@/components/ui/toast';
 import { InstitutionBadge } from '@/components/domain/Institution';
 import { CandidateDialog, InterviewDialog, InviteDialog } from '@/features/recruitment/dialogs';
@@ -19,7 +21,7 @@ export default function Recrutamento() {
   const interviews = useCollection('interviews');
   const { matches } = useScope();
   const toast = useToast();
-  const { confirm, confirmNode } = useConfirm();
+  const { confirm, confirmDelete, confirmNode } = useConfirm();
   const [tab, setTab] = React.useState<'pipeline' | 'entrevistas'>('pipeline');
   const [q, setQ] = React.useState('');
   const [editC, setEditC] = React.useState<Candidate | null>(null);
@@ -27,7 +29,6 @@ export default function Recrutamento() {
   const [editI, setEditI] = React.useState<Interview | null>(null);
   const [newI, setNewI] = React.useState<string | null>(null);
   const [invite, setInvite] = React.useState<Interview | null>(null);
-  const [drag, setDrag] = React.useState<string | null>(null);
   const today = todayISO();
 
   const cs = candidates.items.filter((c) => matches(c.institution_id)).filter((c) => !q || `${c.name} ${c.position} ${c.email}`.toLowerCase().includes(q.toLowerCase()));
@@ -48,7 +49,7 @@ export default function Recrutamento() {
     await actions.remove('candidates', c.id); toast('Dados do candidato excluídos.');
   }
   async function delI(i: Interview) {
-    if (await confirm({ title: 'Excluir entrevista', message: 'Excluir esta entrevista?', danger: true, confirmLabel: 'Excluir' })) await actions.remove('interviews', i.id);
+    await confirmDelete('Excluir entrevista', 'esta entrevista', () => actions.remove('interviews', i.id));
   }
   async function setAttendance(i: Interview, a: Interview['attendance']) {
     try {
@@ -80,42 +81,20 @@ export default function Recrutamento() {
 
       {error ? <ErrorState message={error} onRetry={() => { candidates.reload(); interviews.reload(); }} /> : loading ? <Loading /> : tab === 'pipeline' ? (
         <>
-          <div className="relative mb-3 max-w-md">
-            <label htmlFor="busca-cand" className="sr-only">Buscar candidato</label>
-            <Search size={16} className="pointer-events-none absolute left-3 top-2.5 text-muted" aria-hidden />
-            <input id="busca-cand" type="search" className="field pl-9" placeholder="Buscar candidato…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
+          <SearchInput id="busca-cand" className="mb-3 max-w-md" label="Buscar candidato" placeholder="Buscar candidato…" value={q} onChange={setQ} />
           {candidates.items.length === 0 ? <EmptyState title="Nenhum candidato" description="Cadastre os candidatos de vendas recebidos para iniciar a triagem." action={<Button onClick={() => setNewC(true)}><Plus size={16} />Candidato</Button>} /> : (
-            <div className="relative -mx-4 overflow-x-auto px-4 pb-2">
-              <div className="grid min-w-[1680px] grid-cols-8 gap-3">
-                {STAGES.map((s) => {
-                  const items = cs.filter((c) => c.stage === s.value);
-                  return (
-                    <section key={s.value} aria-label={s.label} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (drag) moveStage(drag, s.value); setDrag(null); }} className="card flex min-h-[220px] flex-col p-3">
-                      <h2 className="mb-2 flex items-center justify-between text-sm text-gold">{s.label}<span className="text-xs text-muted">{items.length}</span></h2>
-                      <ul className="flex flex-1 flex-col gap-2">
-                        {items.map((c) => (
-                          <li key={c.id} draggable onDragStart={() => setDrag(c.id)} className="cursor-grab rounded-lg border border-border bg-surface-2 p-2.5 text-sm">
-                            <button type="button" className="text-left font-semibold hover:text-gold" onClick={() => setEditC(c)}>{c.name}</button>
-                            <div className="text-xs text-muted">{c.position}</div>
-                            <div className="mt-1 flex flex-wrap gap-1"><InstitutionBadge id={c.institution_id} />{c.is_demo && <DemoBadge />}{!c.consent_lgpd && <span className="chip border-orange/50 text-orange">Sem consentimento</span>}</div>
-                            <div className="mt-2 flex items-center gap-1">
-                              <label className="flex-1"><span className="sr-only">Mover {c.name}</span>
-                                <select className="field h-7 py-0 text-xs" value={c.stage} onChange={(e) => moveStage(c.id, e.target.value as CandidateStage)}>
-                                  {STAGES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
-                                </select>
-                              </label>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Agendar entrevista para ${c.name}`} onClick={() => setNewI(c.id)}><CalendarPlus size={14} /></Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Excluir ${c.name}`} onClick={() => delC(c)}><Trash2 size={14} /></Button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  );
-                })}
-              </div>
-            </div>
+            <KanbanBoard columns={STAGES} items={cs} columnOf={(c) => c.stage} onMove={moveStage} itemLabel={(c) => c.name} minWidth={1680} compactTitle
+              renderCard={(c) => (<>
+                <div className="flex items-start justify-between gap-1">
+                  <button type="button" className="text-left font-semibold hover:text-gold" onClick={() => setEditC(c)}>{c.name}</button>
+                  <span className="flex shrink-0">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Agendar entrevista para ${c.name}`} onClick={() => setNewI(c.id)}><CalendarPlus size={14} /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Excluir ${c.name}`} onClick={() => delC(c)}><Trash2 size={14} /></Button>
+                  </span>
+                </div>
+                <div className="text-xs text-muted">{c.position}</div>
+                <div className="mt-1 flex flex-wrap gap-1"><InstitutionBadge id={c.institution_id} />{c.is_demo && <DemoBadge />}{!c.consent_lgpd && <span className="chip border-orange/50 text-orange">Sem consentimento</span>}</div>
+              </>)} />
           )}
         </>
       ) : ivs.length === 0 ? <EmptyState title="Nenhuma entrevista" description="Agende entrevistas a partir dos candidatos selecionados. Não registre horários sem confirmação." action={<Button onClick={() => setNewI('')}><CalendarPlus size={16} />Agendar</Button>} /> : (

@@ -1,16 +1,18 @@
 import * as React from 'react';
-import { AlertTriangle, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { actions, useCollection } from '@/data/store';
 import { useNow, useSettings } from '@/app/hooks';
 import { useScope } from '@/app/scope';
 import { PageHeader, Segmented, Loading, EmptyState, Card, DemoBadge } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import { SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionBadge, InstitutionSelect } from '@/components/domain/Institution';
 import { useToast } from '@/components/ui/toast';
+import { DateNav } from '@/components/ui/date-nav';
 import type { AgendaEvent, AgendaKind } from '@/domain/types';
-import { addDays, fmtDate, fmtLongDate, MONTHS, monthGrid, toMin, weekDates, WEEKDAYS_SHORT, weekdayOf, isWeekend } from '@/lib/time';
+import { addDays, shiftMonth, fmtDate, fmtLongDate, MONTHS, monthGrid, toMin, weekDates, WEEKDAYS_SHORT, weekdayOf, isWeekend } from '@/lib/time';
 import { conflictingIds, findConflicts } from '@/lib/conflicts';
 import { hitsBreak } from '@/lib/workday';
 import { cn } from '@/lib/utils';
@@ -37,10 +39,7 @@ function EventDialog({ open, onOpenChange, event, date, all }: { open: boolean; 
   const toast = useToast();
   const { workday } = useSettings();
   const empty = (): Omit<AgendaEvent, 'id' | 'created_at' | 'updated_at'> => ({ title: '', date, start: '', end: '', kind: 'compromisso', institution_id: null, location: '', notes: '', external_synced: false });
-  const [d, setD] = React.useState(empty());
-  const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(event ? { ...event } : empty()); setErr({}); } }, [open, event, date]); // eslint-disable-line
-  const set = (k: string, v: any) => setD((p) => ({ ...p, [k]: v }));
+  const { d, set, err, setErr } = useDraft(open, () => event ? { ...event } : empty(), [event, date]);
   const valid = d.date && d.start && d.end && toMin(d.end) > toMin(d.start);
   const conflicts = valid ? findConflicts({ id: event?.id ?? '_', date: d.date, start: d.start, end: d.end }, all) : [];
   async function save() {
@@ -94,11 +93,11 @@ export default function Agenda() {
   const [date, setDate] = React.useState(now.date);
   const [editing, setEditing] = React.useState<AgendaEvent | null>(null);
   const [creating, setCreating] = React.useState<string | null>(null);
-  const { confirm, confirmNode } = useConfirm();
+  const { confirmDelete, confirmNode } = useConfirm();
   const conflicts = conflictingIds(items.filter((i) => !i.tentative));
   const onItem = (i: Item) => (i.ref ? () => setEditing(i.ref!) : undefined);
   const dayItems = (d: string) => items.filter((i) => i.date === d).sort((a, b) => a.start.localeCompare(b.start));
-  const step = view === 'dia' ? 1 : view === 'semana' ? 7 : 30;
+  const step = view === 'dia' ? 1 : 7;
   const focus = (d: string) => settings.weekly_focus[String(weekdayOf(d))];
   const totalConflicts = items.filter((i) => conflicts.has(i.id)).length;
 
@@ -107,15 +106,14 @@ export default function Agenda() {
       <PageHeader title="Agenda Semanal" subtitle={view === 'mes' ? `${MONTHS[Number(date.slice(5, 7)) - 1]} de ${date.slice(0, 4)}` : view === 'semana' ? `Semana de ${fmtDate(weekDates(date)[0])}` : fmtLongDate(date)}
         actions={<><Segmented label="Visão" value={view} onChange={setView} options={[{ value: 'dia', label: 'Dia' }, { value: 'semana', label: 'Semana' }, { value: 'mes', label: 'Mês' }]} />
           <Button onClick={() => setCreating(date)}><Plus size={16} />Evento</Button></>} />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="icon" aria-label="Anterior" onClick={() => setDate(view === 'mes' ? `${addDays(`${date.slice(0, 7)}-01`, -1).slice(0, 7)}-01` : addDays(date, -step))}><ChevronLeft size={18} /></Button>
-        <Button variant="secondary" size="sm" onClick={() => setDate(now.date)}>Hoje</Button>
-        <Button variant="ghost" size="icon" aria-label="Próximo" onClick={() => setDate(view === 'mes' ? addDays(`${date.slice(0, 7)}-01`, 32).slice(0, 7) + '-01' : addDays(date, step))}><ChevronRight size={18} /></Button>
+      <DateNav date={date} today={now.date} onChange={setDate}
+        onPrev={() => setDate(view === 'mes' ? shiftMonth(date, -1) : addDays(date, -step))}
+        onNext={() => setDate(view === 'mes' ? shiftMonth(date, 1) : addDays(date, step))}>
         {totalConflicts > 0 && <span className="chip border-danger/60 text-danger"><AlertTriangle size={12} />{totalConflicts} item(ns) em conflito</span>}
         <span className="ml-auto flex flex-wrap gap-2 text-xs text-muted">
           <span className="chip border-gold-300/50">Evento</span><span className="chip border-info/50">Entrevista</span><span className="chip border-orange/50">Reunião</span>
         </span>
-      </div>
+      </DateNav>
 
       {loading ? <Loading /> : view === 'dia' ? (
         <Card className="p-4">
@@ -127,7 +125,7 @@ export default function Agenda() {
                   <span className="w-28 font-mono text-sm">{i.tentative ? 'A confirmar' : `${i.start}–${i.end}`}</span>
                   <div className="min-w-0 flex-1"><div className="font-semibold">{i.title} {i.is_demo && <DemoBadge />}</div><div className="flex gap-1 text-xs text-muted">{i.kind} <InstitutionBadge id={i.institution_id} /></div></div>
                   {conflicts.has(i.id) && <span className="chip border-danger/60 text-danger">Conflito</span>}
-                  {i.ref && <Button variant="ghost" size="icon" aria-label={`Excluir ${i.title}`} onClick={async () => { if (await confirm({ title: 'Excluir evento', message: `Excluir “${i.title}”?`, danger: true, confirmLabel: 'Excluir' })) actions.remove('agenda_events', i.id); }}><Trash2 size={15} /></Button>}
+                  {i.ref && <Button variant="ghost" size="icon" aria-label={`Excluir ${i.title}`} onClick={() => confirmDelete('Excluir evento', `“${i.title}”`, () => actions.remove('agenda_events', i.id))}><Trash2 size={15} /></Button>}
                   {i.ref && <Button variant="ghost" size="sm" onClick={() => setEditing(i.ref!)}>Editar</Button>}
                 </li>
               ))}

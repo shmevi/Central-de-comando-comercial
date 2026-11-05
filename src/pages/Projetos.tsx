@@ -4,6 +4,7 @@ import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { PageHeader, Loading, ErrorState, EmptyState, Card, DemoBadge, Progress } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionBadge, InstitutionSelect } from '@/components/domain/Institution';
@@ -19,9 +20,7 @@ const blocked = (s: ProjectStep, steps: ProjectStep[]) => !!s.depends_on && !ste
 function ProjectDialog({ open, onOpenChange, item }: { open: boolean; onOpenChange: (o: boolean) => void; item: Project | null }) {
   const toast = useToast();
   const empty = (): Omit<Project, 'id' | 'created_at' | 'updated_at'> => ({ name: '', institution_id: null, owner: '', description: '', status: 'proposto', status_confirmed: false, start_date: null, end_date: null, steps: [] });
-  const [d, setD] = React.useState(empty()); const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(item ? { ...item } : empty()); setErr({}); } }, [open, item]);
-  const set = (k: string, v: any) => setD((p) => ({ ...p, [k]: v }));
+  const { d, set, err, setErr } = useDraft(open, () => item ? { ...item } : empty(), [item]);
   const setStep = (id: string, patch: Partial<ProjectStep>) => set('steps', d.steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   async function save() {
     const e: Record<string, string> = {};
@@ -71,7 +70,7 @@ function ProjectDialog({ open, onOpenChange, item }: { open: boolean; onOpenChan
 export default function Projetos() {
   const projects = useCollection('projects');
   const { matches } = useScope();
-  const { confirm, confirmNode } = useConfirm();
+  const { confirmDelete, confirmNode } = useConfirm();
   const [editing, setEditing] = React.useState<Project | null>(null); const [creating, setCreating] = React.useState(false);
   const list = projects.items.filter((p) => matches(p.institution_id));
   const today = todayISO();
@@ -90,7 +89,7 @@ export default function Projetos() {
                     <div className="flex flex-wrap gap-1 text-xs text-muted"><InstitutionBadge id={p.institution_id} /><span className={cn('chip', p.status === 'concluido' ? 'border-success/60 text-success' : p.status === 'em_andamento' && p.status_confirmed ? 'border-gold-300/60 text-gold' : 'border-border')}>{statusLabel}</span>
                       {p.end_date && <span className={cn(p.end_date < today && p.status !== 'concluido' && 'text-danger')}>até {fmtDate(p.end_date)}</span>}</div></div>
                   <div className="flex"><Button variant="ghost" size="icon" aria-label={`Editar ${p.name}`} onClick={() => setEditing(p)}><Pencil size={15} /></Button>
-                    <Button variant="ghost" size="icon" aria-label={`Excluir ${p.name}`} onClick={async () => { if (await confirm({ title: 'Excluir projeto', message: `Excluir “${p.name}”?`, danger: true, confirmLabel: 'Excluir' })) actions.remove('projects', p.id); }}><Trash2 size={15} /></Button></div>
+                    <Button variant="ghost" size="icon" aria-label={`Excluir ${p.name}`} onClick={() => confirmDelete('Excluir projeto', `“${p.name}”`, () => actions.remove('projects', p.id))}><Trash2 size={15} /></Button></div>
                 </div>
                 <div className="mt-3"><div className="mb-1 flex justify-between text-xs"><span className="text-muted">Etapas</span><span className="text-gold">{prog == null ? 'Sem etapas' : `${prog}%`}</span></div>{prog != null && <Progress value={prog} label={`Progresso de ${p.name}`} />}</div>
                 <ol className="mt-3 space-y-1 text-sm">

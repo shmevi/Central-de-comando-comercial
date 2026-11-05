@@ -8,6 +8,7 @@
                                                                       └─ SupabaseRepository (PostgREST + RLS)
 ```
 
+- **Configuração** (`src/data/config.ts`): decide o modo pelas variáveis `VITE_*` e recusa configuração perigosa.
 - **A UI nunca chama o Supabase diretamente.** Ela usa `useCollection('<tabela>')`, que expõe
   `items / loading / error / create / update / remove / reload`. O repositório concreto é escolhido em
   `src/data/index.ts` conforme `DATA_MODE`.
@@ -18,10 +19,13 @@
 - **Escopo de instituição** global (cabeçalho): todas as telas filtram por instituição para não misturar dados.
   Candidatos, feedbacks e OKRs exigem instituição; o banco valida que a instituição pertence ao mesmo usuário.
 
+- **Componentes compartilhados** (`src/components/ui`): `KanbanBoard` (Tarefas, Recrutamento, Melhorias),
+  `useDraft` (estado dos formulários), `SearchInput`, `DateNav`, `useConfirm().confirmDelete`, `ErrorBoundary`.
+
 ## Stack
 
 React 18 + TypeScript + Vite · Tailwind CSS · componentes no padrão shadcn/ui (Radix Dialog/Slot + CVA) ·
-Lucide · Recharts · jsPDF (PDF) · Supabase JS · Vitest · Playwright (fumaça).
+Lucide · Recharts · jsPDF (PDF) · Supabase JS · fontes Inter e Barlow Condensed embutidas (@fontsource) · Vitest · Playwright.
 
 ## Mapa de telas
 

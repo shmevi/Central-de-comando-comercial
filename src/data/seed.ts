@@ -3,6 +3,7 @@ import { repo } from './index';
 import { DEFAULT_SETTINGS, INITIAL_TASKS, INSTITUTIONS, baseRoutineBlocks } from '@/domain/defaults';
 import type { Task } from '@/domain/types';
 import { nowIso } from '@/lib/utils';
+import type { RepositoryError } from './repository';
 import { todayISO, addDays } from '@/lib/time';
 
 /** Cria a configuração inicial na primeira execução (por usuário). */
@@ -12,13 +13,25 @@ export function ensureSeed() {
   return seeding;
 }
 export function resetSeedGuard() { seeding = null; }
+const isDuplicate = (e: unknown) => (e as RepositoryError)?.cause && ((e as RepositoryError).cause as { code?: string }).code === '23505';
+/** Cria ignorando "já existe" (outra aba ou uma tentativa anterior chegou primeiro). */
+async function createOnce<C extends Parameters<typeof repo>[0]>(c: C, input: any) {
+  try { await repo(c).create(input); } catch (e) { if (!isDuplicate(e)) throw e; }
+}
+
+/**
+ * Idempotente: cada passo confere o que já existe. As configurações são gravadas POR ÚLTIMO e servem
+ * de marca de "primeiro acesso concluído" — se a conexão cair no meio, o próximo acesso completa o que faltou.
+ */
 async function doSeed() {
-  const settings = await repo('settings').list();
-  if (settings.length) return;
-  await repo('settings').create({ ...DEFAULT_SETTINGS });
-  for (const i of INSTITUTIONS) await repo('institutions').create({ ...i });
-  await repo('routine_templates').create({ name: 'Rotina-base', weekday: null, blocks: baseRoutineBlocks(), is_default: true });
+  if ((await repo('settings').list()).length) return;
+  const insts = await repo('institutions').list();
+  for (const i of INSTITUTIONS) if (!insts.some((x) => x.code === i.code)) await createOnce('institutions', { ...i });
+  if (!(await repo('routine_templates').list()).length)
+    await repo('routine_templates').create({ name: 'Rotina-base', weekday: null, blocks: baseRoutineBlocks(), is_default: true });
+  const tasks = await repo('tasks').list();
   for (const t of INITIAL_TASKS) {
+    if (tasks.some((x) => x.title === t.title && x.due_date === t.due_date)) continue;
     const task: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
       ...t, institution_id: null, status: 'a_fazer', checklist: [], recurrence: 'nenhuma',
       is_mission: false, mission_date: null, completed_at: null,
@@ -26,6 +39,7 @@ async function doSeed() {
     };
     await repo('tasks').create(task);
   }
+  await createOnce('settings', { ...DEFAULT_SETTINGS });
 }
 
 /** Dados FICTÍCIOS para explorar o app. Todos marcados is_demo = true. */

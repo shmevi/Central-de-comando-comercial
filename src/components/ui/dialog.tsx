@@ -45,5 +45,9 @@ export function useConfirm() {
       <p className="text-sm">{state?.message}</p>
     </Dialog>
   );
-  return { confirm, confirmNode: node };
+  /** Pergunta "Excluir X?" e executa `action` só se confirmado. */
+  const confirmDelete = React.useCallback(async (title: string, what: string, action: () => Promise<unknown>) => {
+    if (await confirm({ title, message: `Excluir ${what}? Esta ação não pode ser desfeita.`, danger: true, confirmLabel: 'Excluir' })) await action();
+  }, [confirm]);
+  return { confirm, confirmDelete, confirmNode: node };
 }

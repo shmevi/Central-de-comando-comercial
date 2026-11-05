@@ -1,14 +1,16 @@
 import * as React from 'react';
-import { Lock, MessageSquarePlus, Pencil, Plus, Search, Trash2, UserPlus } from 'lucide-react';
+import { Lock, MessageSquarePlus, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { useSettings } from '@/app/hooks';
 import { PageHeader, Segmented, Loading, ErrorState, EmptyState, Card, DemoBadge, Progress } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
+import { useDraft } from '@/components/ui/use-draft';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionBadge, InstitutionMulti, InstitutionSelect } from '@/components/domain/Institution';
 import { useToast } from '@/components/ui/toast';
+import { SearchInput } from '@/components/ui/search';
 import type { Feedback, Person } from '@/domain/types';
 import { fmtDate, todayISO } from '@/lib/time';
 import { nowIso } from '@/lib/utils';
@@ -17,10 +19,7 @@ import { checkPin } from '@/lib/pin';
 function PersonDialog({ open, onOpenChange, person }: { open: boolean; onOpenChange: (o: boolean) => void; person: Person | null }) {
   const toast = useToast();
   const empty = (): Omit<Person, 'id' | 'created_at' | 'updated_at'> => ({ name: '', role: '', email: '', phone: '', institution_ids: [], active: true, notes: '' });
-  const [d, setD] = React.useState(empty());
-  const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(person ? { ...person } : empty()); setErr({}); } }, [open, person]);
-  const set = (k: string, v: any) => setD((p) => ({ ...p, [k]: v }));
+  const { d, set, err, setErr } = useDraft(open, () => person ? { ...person } : empty(), [person]);
   async function save() {
     const e: Record<string, string> = {};
     if (!d.name.trim()) e.name = 'Informe o nome.';
@@ -50,11 +49,9 @@ function FeedbackDialog({ open, onOpenChange, feedback, personId }: { open: bool
   const people = useCollection('people');
   const toast = useToast();
   const empty = (): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => ({ person_id: personId ?? '', institution_id: null, date: todayISO(), positives: '', to_develop: '', action_plan: '', deadline: null, status: 'aberto', reviews: [], confidential: true });
-  const [d, setD] = React.useState(empty());
+  const { d, set, err, setErr } = useDraft(open, () => (feedback ? { ...feedback } : empty()), [feedback, personId]);
   const [review, setReview] = React.useState({ text: '', progress: 0 });
-  const [err, setErr] = React.useState<Record<string, string>>({});
-  React.useEffect(() => { if (open) { setD(feedback ? { ...feedback } : empty()); setErr({}); setReview({ text: '', progress: 0 }); } }, [open, feedback, personId]); // eslint-disable-line
-  const set = (k: string, v: any) => setD((p) => ({ ...p, [k]: v }));
+  React.useEffect(() => { if (open) setReview({ text: '', progress: 0 }); }, [open]);
   const person = people.items.find((p) => p.id === d.person_id);
   async function save() {
     const e: Record<string, string> = {};
@@ -147,11 +144,7 @@ export default function Equipes() {
       <PageHeader title="Equipes e Feedbacks" subtitle={`${ps.length} pessoa(s)`}
         actions={<><Segmented label="Seção" value={tab} onChange={setTab} options={[{ value: 'pessoas', label: 'Pessoas' }, { value: 'feedbacks', label: 'Feedbacks' }]} />
           {tab === 'pessoas' ? <Button onClick={() => setNewP(true)}><UserPlus size={16} />Pessoa</Button> : !restricted && <Button onClick={() => setNewF('')}><MessageSquarePlus size={16} />Feedback</Button>}</>} />
-      <div className="relative mb-3 max-w-md">
-        <label htmlFor="busca-eq" className="sr-only">Buscar</label>
-        <Search size={16} className="pointer-events-none absolute left-3 top-2.5 text-muted" aria-hidden />
-        <input id="busca-eq" type="search" className="field pl-9" placeholder="Buscar por nome…" value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
+      <SearchInput id="busca-eq" className="mb-3 max-w-md" placeholder="Buscar por nome…" value={q} onChange={setQ} />
       {people.error ? <ErrorState message={people.error} onRetry={people.reload} /> : people.loading ? <Loading /> : tab === 'pessoas' ? (
         ps.length === 0 ? <EmptyState title="Nenhuma pessoa" description="Cadastre a equipe comercial e vincule cada pessoa às instituições em que atua." action={<Button onClick={() => setNewP(true)}><Plus size={16} />Pessoa</Button>} /> : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

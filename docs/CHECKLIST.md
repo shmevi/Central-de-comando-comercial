@@ -3,6 +3,8 @@
 Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`) · **[M]** verificação manual.
 
 ## Geral
+- [A] Testes de navegador rodam no **build de produção**, com a mesma `Content-Security-Policy` da Vercel/Netlify (`npm run test:e2e`)
+- [A] Abrir uma rota interna direto (ex.: `/relatorios`) funciona — sem 404
 - [A] Todas as 14 rotas abrem sem erro de console (desktop 1366px e celular 360px)
 - [A] Nenhuma rota tem rolagem horizontal no celular
 - [A] Dados persistem após recarregar a página
@@ -81,10 +83,14 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [M] Alterar jornada recalcula carga efetiva; instituição com tarefas não pode ser excluída (só desativada)
 - [M] Carregar/remover demonstração; exportar/importar backup JSON; apagar dados locais pede confirmação
 
-## Supabase (quando configurado)
-- [A] Feedback/entrevista/melhoria não podem apontar para pessoa/candidato/sistema de outro usuário (`npm run test:rls`)
-- [M] Listas com mais de 1000 registros carregam completas (leitura paginada)
-- [M] Sem `VITE_ALLOW_SIGNUP=true`, a tela de login não oferece "Criar conta"
-- [M] Aplicar a migration em projeto novo; criar conta; seed criado uma única vez por usuário
-- [A] Usuário B não vê nem altera dados de A, não forja `user_id`, não usa instituição de A; `anon` sem acesso (`npm run test:rls`)
-- [M] Rodar *Advisors* de segurança do Supabase sem alertas de RLS
+## Supabase
+- [A] Configuração: sem URL/chave no modo Supabase o app para e explica; chave secreta é recusada; URL `/rest/v1` é recusada
+- [A] Leitura paginada: 1200 registros chegam completos; `user_id`/`created_at` nunca são enviados pelo app
+- [A] Erros do banco em português (ex.: tabela ausente → “aplique a migration”)
+- [A] Primeiro acesso interrompido é completado no acesso seguinte, sem duplicar
+- [A] No navegador, contra Supabase simulado (`npm run test:supabase`): senha errada, “Esqueci minha senha”, login,
+  primeiro acesso no banco, dados após recarregar, sair, isolamento entre dois usuários, link de recuperação → nova senha
+- [A] RLS no PostgreSQL: usuário B não vê nem altera dados de A, não forja `user_id`, não referencia instituição/pessoa de A; `anon` sem acesso (`npm run test:rls`)
+- [M] Projeto real: aplicar a migration, criar usuário com *Auto Confirm*, entrar, conferir o Security Advisor
+- [M] Projeto real: “Esqueci minha senha” chega por e-mail e o link abre a tela de nova senha (exige Site URL/Redirect URLs)
+- [M] Hospedagem: as variáveis `VITE_*` estão cadastradas e o site foi publicado de novo depois de mudá-las

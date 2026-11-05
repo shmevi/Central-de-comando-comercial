@@ -5,7 +5,7 @@
 -- Os nomes de colunas casam 1:1 com src/domain/types.ts.
 -- =====================================================================
 
-create extension if not exists pgcrypto;
+-- gen_random_uuid() é nativa do PostgreSQL 13+ (não precisa da extensão pgcrypto).
 
 -- Função genérica para updated_at
 create or replace function public.set_updated_at() returns trigger
