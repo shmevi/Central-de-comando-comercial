@@ -5,6 +5,13 @@ const ROUTES = ['/', '/rotina', '/agenda', '/tarefas', '/recrutamento', '/equipe
 let fails = 0;
 const recifeToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Recife' }).format(new Date());
 const isoMinusDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+/** Registra o valor do 1º campo (input/textarea) de cada diálogo NO MOMENTO em que ele aparece na tela. */
+const watchFirstPaint = (p, sel) => p.evaluate((sel) => {
+  window.__firstValues = [];
+  const obs = new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) { const f = n.querySelector?.(sel); if (f) window.__firstValues.push(f.value); } });
+  obs.observe(document.body, { childList: true, subtree: true });
+}, sel);
+const firstPaint = (p) => p.evaluate(() => window.__firstValues);
 const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++; };
 
 (async () => {
@@ -45,6 +52,13 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   // Persistência
   await p.reload(); await p.waitForSelector('text=Tarefa E2E');
   ok(await p.locator('input[aria-label="Reabrir Tarefa E2E"]').isChecked(), 'persistência após recarregar');
+
+  // Abrir para editar: o formulário já aparece com os dados da tarefa (sem piscar valores antigos)
+  await watchFirstPaint(p, '[role=dialog] input');
+  await p.click('button:has-text("Realizar entrevistas e registrar decisões")');
+  await p.locator('role=dialog').waitFor();
+  ok((await firstPaint(p))[0] === 'Realizar entrevistas e registrar decisões', `editar tarefa abre já com o título certo (${(await firstPaint(p))[0]})`);
+  await p.keyboard.press('Escape');
 
   // Busca
   await p.fill('#busca', 'E2E'); await p.waitForTimeout(200);
@@ -96,7 +110,10 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   await p.keyboard.press('Escape');
   await p.click('role=radio[name="Entrevistas"]');
   ok(await p.locator('text=a confirmar').count() >= 1, 'horário não confirmado aparece como "a confirmar"');
+  await watchFirstPaint(p, '[role=dialog] textarea');
   await p.click('button[aria-label="Gerar convite para WhatsApp"]');
+  await p.locator('role=dialog >> textarea').waitFor();
+  ok((await firstPaint(p)).every((v) => v.length > 0), 'convite já aparece preenchido (sem campo vazio no primeiro desenho)');
   const invite = await p.inputValue('role=dialog >> textarea');
   ok(invite.includes('data e horário a confirmar') && !invite.includes('14:00'), 'convite não inventa horário');
   await p.keyboard.press('Escape');

@@ -135,24 +135,36 @@ export function InterviewDialog({ open, onOpenChange, interview, candidateId }: 
 }
 
 export function InviteDialog({ open, onOpenChange, interview }: { open: boolean; onOpenChange: (o: boolean) => void; interview: Interview | null }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} title="Convite para WhatsApp" description="Nada é enviado automaticamente. Revise, copie e envie você mesmo.">
+      {/* key: cada entrevista monta o texto do zero, já preenchido no primeiro desenho (sem campo vazio piscando) */}
+      {interview && <InviteBody key={interview.id + interview.updated_at} interview={interview} onClose={() => onOpenChange(false)} />}
+    </Dialog>
+  );
+}
+
+function InviteBody({ interview, onClose }: { interview: Interview; onClose: () => void }) {
   const candidates = useCollection('candidates');
   const { byId } = useInstitutions();
   const toast = useToast();
-  const c = candidates.items.find((x) => x.id === interview?.candidate_id);
-  const [text, setText] = React.useState('');
-  React.useEffect(() => {
-    if (open && interview) setText(buildWhatsAppInvite({ name: c?.name ?? '', position: c?.position ?? '', institution: c?.institution_id ? byId[c.institution_id]?.name ?? '' : '', date: interview.date, start: interview.start, confirmed: interview.time_confirmed, location: interview.location }));
-  }, [open, interview]); // eslint-disable-line
+  const c = candidates.items.find((x) => x.id === interview.candidate_id);
+  const [text, setText] = React.useState(() => buildWhatsAppInvite({
+    name: c?.name ?? '', position: c?.position ?? '', institution: c?.institution_id ? byId[c.institution_id]?.name ?? '' : '',
+    date: interview.date, start: interview.start, confirmed: interview.time_confirmed, location: interview.location,
+  }));
   async function copy() {
     try { await navigator.clipboard.writeText(text); toast('Convite copiado. Cole no WhatsApp e envie manualmente.'); }
     catch { toast('Não foi possível copiar automaticamente. Selecione o texto e copie.', 'erro'); }
   }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Convite para WhatsApp" description="Nada é enviado automaticamente. Revise, copie e envie você mesmo."
-      footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Fechar</Button><Button onClick={copy}><Copy size={16} />Copiar texto</Button></>}>
+    <>
       <TextArea label="Mensagem" rows={12} value={text} onChange={(e) => setText(e.target.value)} />
       {c?.phone && <p className="mt-2 text-xs text-muted">Telefone do candidato: {c.phone}</p>}
       {c && !c.consent_lgpd && <p className="mt-2 text-xs text-orange">Atenção: consentimento LGPD ainda não registrado para este candidato.</p>}
-    </Dialog>
+      <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={onClose}>Fechar</Button>
+        <Button onClick={copy}><Copy size={16} />Copiar texto</Button>
+      </div>
+    </>
   );
 }
