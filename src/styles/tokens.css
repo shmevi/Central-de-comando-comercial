@@ -1,0 +1,51 @@
+/* ==========================================================
+   DESIGN TOKENS — Central de Comando Comercial
+   Inspirados na identidade observada em cppem.com.br (aprox.).
+   Valores em canais RGB para permitir opacidade no Tailwind.
+   ========================================================== */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: 11 11 13;          /* #0B0B0D */
+  --surface: 20 20 22;     /* #141416 */
+  --surface-2: 28 28 32;   /* #1C1C20 */
+  --border: 42 42 48;      /* #2A2A30 */
+  --fg: 243 239 230;       /* #F3EFE6 creme */
+  --muted: 163 158 146;    /* #A39E92 cinza-quente */
+  --gold-100: 243 216 142; /* #F3D88E */
+  --gold-300: 212 175 90;  /* #D4AF5A */
+  --gold-500: 212 175 90;
+  --gold-700: 140 107 46;  /* #8C6B2E */
+  --gold-text: 243 216 142;/* texto dourado legível no fundo */
+  --orange: 233 133 43;    /* #E9852B */
+  --success: 110 200 140;
+  --warning: 233 170 60;
+  --danger: 240 110 100;
+  --info: 120 170 240;
+  --on-gold: 20 16 8;
+  --focus: 243 216 142;
+  --chart-1: 176 138 61;   /* validado: banda L e contraste ≥3:1 sobre #141416 */
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: 247 244 236;
+  --surface: 255 255 255;
+  --surface-2: 240 236 226;
+  --border: 214 207 192;
+  --fg: 26 24 20;
+  --muted: 92 87 77;       /* AA sobre --bg/--surface */
+  --gold-100: 243 216 142;
+  --gold-300: 212 175 90;
+  --gold-500: 170 132 56;
+  --gold-700: 140 107 46;
+  --gold-text: 112 84 30;  /* AA sobre fundos claros */
+  --orange: 178 88 10;
+  --success: 22 120 60;
+  --warning: 150 95 0;
+  --danger: 185 40 35;
+  --info: 30 90 180;
+  --on-gold: 20 16 8;
+  --focus: 140 107 46;
+  --chart-1: 170 132 56;   /* validado sobre #FFFFFF */
+}

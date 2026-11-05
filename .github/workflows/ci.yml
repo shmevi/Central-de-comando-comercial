@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificacoes:
+    name: Tipos, testes unitários e build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:types
+      - run: npm test
+      - name: vercel.json e netlify.toml em dia com security-headers.json
+        run: node scripts/sync-headers.mjs --check
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  rls:
+    name: Migration e RLS (PostgreSQL)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Testar migration e políticas RLS
+        run: bash supabase/tests/run_local.sh
+
+  e2e:
+    name: Navegador (build de produção, modo local e modo Supabase)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Modo local, com os cabeçalhos de segurança de produção
+        run: npm run test:e2e
+      - name: Modo Supabase (servidor simulado)
+        run: npm run test:supabase
