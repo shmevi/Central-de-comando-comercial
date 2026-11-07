@@ -54,7 +54,9 @@ export function Progress({ value, label, className }: { value: number; label: st
 }
 export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-border bg-surface p-1">
+    // flex-wrap + max-w-full: em tela estreita as abas passam para uma segunda linha em vez de estourar a página.
+    // Quando cabem numa linha (desktop), nada muda; gap-y só existe entre linhas quebradas.
+    <div role="radiogroup" aria-label={label} className="inline-flex max-w-full flex-wrap gap-y-1 rounded-xl border border-border bg-surface p-1">
       {options.map((o) => (
         <button key={o.value} role="radio" aria-checked={value === o.value} type="button" onClick={() => onChange(o.value)}
           className={cn('rounded-lg px-3 py-1 font-display text-sm font-bold uppercase tracking-wider', value === o.value ? 'bg-gold-gradient on-gold' : 'text-muted hover:text-fg')}>
