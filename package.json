@@ -15,6 +15,7 @@
     "sync:headers": "node scripts/sync-headers.mjs",
     "preview:prod": "node e2e/serve-dist.cjs",
     "test:supabase": "node e2e/run.cjs supabase",
+    "build:edge": "node scripts/build-edge.mjs",
     "check": "npm run lint:types && npm test && node scripts/sync-headers.mjs --check && npm run build"
   },
   "dependencies": {

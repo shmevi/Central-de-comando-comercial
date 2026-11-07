@@ -117,6 +117,13 @@ Central → `pendente_push`; os dois → conflito, nada sobrescrito. (6) Item ap
 item que sumiu do Notion não é apagado na Central. (7) KRs são agrupados pelo Objetivo (base VISÃO); o título do
 Objetivo é somente leitura na Central porque a página é compartilhada.
 
+Servidor: Edge Function `supabase/functions/notion-sync` (lógica em `serverHandler.ts`, adaptador da API oficial em
+`apiAdapter.ts` — nenhum dos dois é importado por tela, então não vão para o navegador). Esta versão é **só dry-run**:
+lê o Notion com o token do Edge Secret `NOTION_TOKEN`, lê a Central com o JWT de quem chamou (RLS), calcula o plano e
+devolve contagens e IDs de página — sem gravar em lugar nenhum; `dry_run: false` é recusado. Deploy:
+`npm run build:edge` gera `supabase/functions/notion-sync/dist/index.js` (bundle único, sem dependências) para enviar
+ao Supabase.
+
 Banco: migration `0002_notion_sync.sql` (`notion_sync_state`, unicidade de `external_ref`, `review_queue.kind`,
 `sync_logs.external_id/fields_changed`, `settings.notion_config`). O token do Notion **nunca** fica no banco nem no
 frontend. A escrita (Central → Notion) e o adaptador real (API do Notion num componente servidor) são fases posteriores.

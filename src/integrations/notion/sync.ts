@@ -5,12 +5,12 @@
  */
 import { actions } from '@/data/store';
 import { repo } from '@/data';
-import type { KeyResult, NotionSyncEntity, NotionSyncState, Objective, ReviewQueueItem, Settings, Task } from '@/domain/types';
+import type { KeyResult, NotionSyncState, Objective, ReviewQueueItem, Settings, Task } from '@/domain/types';
 import { nowIso, uid } from '@/lib/utils';
-import { queryAll, type NotionAdapter, type NotionPage } from './adapter';
-import { ACTIVE_STATUS_GROUPS, PROPS, checkNotionConfig, describeConfigProblem, normalizePageId, resolveNotionConfig } from './config';
-import { isOwnedBy, relationOf } from './mapping';
-import { planNotionSync, type StatePatch, type SyncPlan } from './plan';
+import type { NotionAdapter } from './adapter';
+import { checkNotionConfig, describeConfigProblem, normalizePageId, resolveNotionConfig } from './config';
+import { readAndPlan } from './pipeline';
+import type { StatePatch, SyncPlan } from './plan';
 
 export type SyncSummary = SyncPlan['counts'];
 
@@ -28,38 +28,8 @@ export async function syncNotion(adapter: NotionAdapter, settings: Settings, sav
     const [tasks, objectives, states, reviews] = await Promise.all([
       repo('tasks').list(), repo('objectives').list(), repo('notion_sync_state').list(), repo('review_queue').list(),
     ]);
-
-    // Barreira 1: filtro na origem pelo ID estável + só itens ativos (escopo inicial).
-    const base = { personId: config.person_id };
-    const tarefas = await queryAll(adapter, 'tarefas', { ...base, dataSourceId: config.tasks_data_source_id, personProperty: PROPS.tarefas.responsible, statusProperty: PROPS.tarefas.status, statusGroups: ACTIVE_STATUS_GROUPS });
-    const krs = await queryAll(adapter, 'krs', { ...base, dataSourceId: config.krs_data_source_id, personProperty: PROPS.krs.responsible, statusProperty: PROPS.krs.status, statusGroups: ACTIVE_STATUS_GROUPS });
-
-    // Itens já rastreados que saíram do filtro (ex.: concluídos no Notion) são buscados um a um,
-    // para a Central receber a mudança em vez de ficar com o estado antigo para sempre.
-    // Não busca de novo o que saiu do escopo (outro responsável) ou foi apagado: nada de ler página alheia à toa.
-    const SKIP = new Set(['removido_no_notion', 'fora_do_escopo', 'removido_na_central']);
-    const tracked = (e: NotionSyncEntity) => states.filter((s) => s.entity === e && s.local_id && !SKIP.has(s.sync_status)).map((s) => normalizePageId(s.notion_page_id));
-    const extra = async (source: 'tarefas' | 'krs', got: NotionPage[]) => {
-      const have = new Set(got.map((p) => normalizePageId(p.id)));
-      const want = tracked(source).filter((id) => !have.has(id));
-      const found = want.length ? await adapter.retrieve(source, want) : [];
-      const foundIds = new Set(found.map((p) => normalizePageId(p.id)));
-      return { pages: found, missing: want.filter((id) => !foundIds.has(id)) };
-    };
-    const xt = await extra('tarefas', tarefas);
-    const xk = await extra('krs', krs);
-    const allKrs = [...krs, ...xk.pages];
-
-    // Objetivos: só os referenciados por KRs que JÁ passaram pela barreira 2 (não busca nada por causa de KR alheio).
-    const parentIds = [...new Set(allKrs.filter((p) => isOwnedBy(p, PROPS.krs.responsible, config.person_id)).flatMap((p) => relationOf(p.properties[PROPS.krs.objective])))];
-    const objetivos = parentIds.length ? await adapter.retrieve('objetivos', parentIds) : [];
-
-    const plan = await planNotionSync({
-      config, isDemo: adapter.isDemo, now: startedAt, newId: uid,
-      notion: { tarefas: [...tarefas, ...xt.pages], krs: allKrs, objetivos },
-      missing: [...xt.missing, ...xk.missing],
-      local: { tasks, objectives, states, reviews },
-    });
+    // Barreira 1 (filtro na origem), itens rastreados e Objetivos: ver pipeline.ts. Barreira 2: plan.ts.
+    const { plan } = await readAndPlan(adapter, config, { tasks, objectives, states, reviews }, { now: startedAt, newId: uid });
     await applyPlan(plan, states, adapter.isDemo);
     await saveSettings?.({ notion_config: { ...config, last_sync_at: startedAt } });
     return plan.counts;
