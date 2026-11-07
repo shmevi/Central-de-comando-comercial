@@ -11,5 +11,9 @@ RUN "$PGBIN/initdb -U postgres -D $D/data -A trust >/dev/null && $PGBIN/pg_ctl -
 trap 'RUN "$PGBIN/pg_ctl -D $D/data stop -m fast" >/dev/null; rm -rf "$D"' EXIT
 P="psql -h $D -p $PORT -U postgres -d postgres -q -v ON_ERROR_STOP=1"
 $P -f "$ROOT/supabase/tests/auth_stub.sql"
-$P -f "$ROOT/supabase/migrations/0001_central_comando.sql"
+# Todas as migrations, em ordem
+for f in "$ROOT"/supabase/migrations/*.sql; do $P -f "$f"; done
 $P -f "$ROOT/supabase/tests/rls_test.sql"
+$P -f "$ROOT/supabase/tests/notion_sync_test.sql"
+# A 0002 precisa poder ser reaplicada num banco de teste sem erro
+$P -f "$ROOT/supabase/migrations/0002_notion_sync.sql"

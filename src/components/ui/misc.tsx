@@ -18,6 +18,8 @@ export function CardHeader({ title, icon, action, subtitle }: { title: string; i
 export function Badge({ className, children, color }: { className?: string; children: React.ReactNode; color?: string }) {
   return <span className={cn('chip border-border text-muted', className)} style={color ? { borderColor: `${color}80`, color, background: `${color}14` } : undefined}>{children}</span>;
 }
+/** Selo discreto de item sincronizado do Notion. */
+export function NotionBadge() { return <span className="chip border-border text-muted" title="Sincronizado do Notion">Notion</span>; }
 export function DemoBadge() { return <span className="demo-badge" title="Dado fictício para demonstração">Demonstração</span>; }
 
 export function Loading({ label = 'Carregando…' }: { label?: string }) {

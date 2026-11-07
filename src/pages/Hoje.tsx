@@ -57,7 +57,7 @@ function QuickNote({ date }: { date: string }) {
 export default function Hoje() {
   const now = useNow();
   const { settings, workday } = useSettings();
-  const { matches } = useScope();
+  const { matches, matchesItem } = useScope();
   const tasks = useCollection('tasks');
   const interviews = useCollection('interviews');
   const candidates = useCollection('candidates');
@@ -69,7 +69,7 @@ export default function Hoje() {
   const status = workdayStatus(now.date, now.time, workday);
   const total = Math.max(1, effectiveMinutes(workday));
   const worked = workedMinutes(now.date, now.time, workday);
-  const scoped = tasks.items.filter((t) => matches(t.institution_id));
+  const scoped = tasks.items.filter((t) => matchesItem(t));
   const mission = missionFor(scoped, now.date);
   const open = scoped.filter(isOpen);
   const overdue = open.filter((t) => isOverdue(t, now.date));

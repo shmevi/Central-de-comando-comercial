@@ -13,7 +13,7 @@ export function friendlyDbError(e: PgError, action: string): string {
   const code = e?.code ?? '';
   const msg = (e?.message ?? '').toLowerCase();
   if (code === 'PGRST205' || code === '42P01' || msg.includes('could not find the table') || msg.includes('does not exist'))
-    return `${action}: tabela não encontrada no banco. Aplique a migration supabase/migrations/0001_central_comando.sql no projeto Supabase.`;
+    return `${action}: tabela não encontrada no banco. Aplique as migrations de supabase/migrations/ (em ordem: 0001, 0002…) no projeto Supabase.`;
   if (code === 'PGRST301' || code === 'PGRST303' || msg.includes('jwt expired')) return `${action}: sua sessão expirou. Saia e entre novamente.`;
   if (code === '42501') return `${action}: sem permissão (o registro não é seu ou a sessão expirou).`;
   if (code === '23505') return `${action}: já existe um registro igual.`;

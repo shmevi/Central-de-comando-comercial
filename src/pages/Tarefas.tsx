@@ -24,7 +24,7 @@ const COLUMNS: TaskStatus[] = ['a_fazer', 'em_andamento', 'aguardando', 'conclui
 
 export default function Tarefas() {
   const tasks = useCollection('tasks');
-  const { matches } = useScope();
+  const { matchesItem } = useScope();
   const { settings } = useSettings();
   const [params, setParams] = useSearchParams();
   const [view, setView] = React.useState<'lista' | 'kanban'>(() => { try { return (localStorage.getItem('ccc:tasks-view') as any) ?? 'lista'; } catch { return 'lista'; } });
@@ -42,7 +42,7 @@ export default function Tarefas() {
   React.useEffect(() => { try { localStorage.setItem('ccc:tasks-view', view); } catch { /* */ } }, [view]);
 
   const filtered = tasks.items
-    .filter((t) => matches(t.institution_id))
+    .filter((t) => matchesItem(t))
     .filter((t) => !q || `${t.title} ${t.description}`.toLowerCase().includes(q.toLowerCase()))
     .filter((t) => !status || t.status === status)
     .filter((t) => !priority || t.priority === priority)

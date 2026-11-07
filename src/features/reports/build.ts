@@ -1,4 +1,5 @@
 import type { EntityMap } from '@/domain/types';
+import { isPersonalNotion } from '@/integrations/notion/mapping';
 import { recifeParts, toMin, weekDates, fmtDate, fmtDuration } from '@/lib/time';
 
 export type Row = { section: string; indicator: string; value: number | string | null; note?: string };
@@ -24,12 +25,13 @@ export function buildReport(dates: string[], data: Data, today: string, nowTime:
   rows.push({ section: 'Rotina', indicator: 'Tempo concluído', value: generated.length ? fmtDuration(doneMin) : null });
   rows.push({ section: 'Rotina', indicator: 'Blocos encerrados sem status registrado', value: generated.length ? unfilled.length : null, note: unfilled.length ? 'Status não preenchido — não contar como realizado' : undefined });
 
-  const tasks = data.tasks.filter((t) => match(t.institution_id));
+  // Tarefas pessoais do Notion não têm instituição e entram em qualquer escopo (mesma regra do filtro global).
+  const tasks = data.tasks.filter((t) => isPersonalNotion(t) || match(t.institution_id));
   rows.push({ section: 'Tarefas', indicator: 'Tarefas concluídas', value: tasks.filter((t) => t.status === 'concluida' && inRange(dateOfIso(t.completed_at))).length });
   rows.push({ section: 'Tarefas', indicator: 'Tarefas criadas', value: tasks.filter((t) => inRange(dateOfIso(t.created_at))).length });
   const lastDay = dates[dates.length - 1];
   rows.push({ section: 'Tarefas', indicator: 'Abertas com prazo vencido (fim do período)', value: tasks.filter((t) => !['concluida', 'cancelada'].includes(t.status) && t.due_date && t.due_date < (lastDay < today ? lastDay : today)).length });
-  rows.push({ section: 'Tarefas', indicator: 'Tarefas sem instituição', value: tasks.filter((t) => !t.institution_id && !['concluida', 'cancelada'].includes(t.status)).length, note: 'Classifique para não misturar dados' });
+  rows.push({ section: 'Tarefas', indicator: 'Tarefas sem instituição', value: tasks.filter((t) => !t.institution_id && !isPersonalNotion(t) && !['concluida', 'cancelada'].includes(t.status)).length, note: 'Classifique para não misturar dados' });
 
   const ivs = data.interviews.filter((i) => inRange(i.date) && match(i.institution_id));
   const ivPast = ivs.filter((i) => past.includes(i.date));

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useDraft } from '@/components/ui/use-draft';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
 import { InstitutionSelect } from '@/components/domain/Institution';
+import { isFromNotion } from '@/integrations/notion/mapping';
 import { PRIORITY, RECURRENCE, TASK_STATUS, toOptions } from '@/domain/labels';
 import type { Task } from '@/domain/types';
 import { actions } from '@/data/store';
@@ -52,6 +53,7 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
     <Dialog open={open} onOpenChange={onOpenChange} title={task ? 'Editar tarefa' : 'Nova tarefa'} wide
       footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={() => save()} disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</Button></>}>
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
+        {task && isFromNotion(task) && <p className="sm:col-span-2 rounded-lg border border-border p-2 text-xs text-muted">Sincronizada do Notion. Título, status, prioridade e prazo alterados aqui ficam marcados como pendentes de envio — o envio ao Notion é uma fase futura.</p>}
         <TextField className="sm:col-span-2" label="Título" required value={d.title} onChange={(e) => set('title', e.target.value)} error={err.title} autoFocus />
         <TextArea className="sm:col-span-2" label="Descrição" value={d.description} onChange={(e) => set('description', e.target.value)} />
         <InstitutionSelect value={d.institution_id} onChange={(v) => set('institution_id', v)} />

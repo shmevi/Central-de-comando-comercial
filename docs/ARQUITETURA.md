@@ -91,11 +91,32 @@ Tokens em `src/styles/tokens.css` (canais RGB, consumidos pelo Tailwind em `tail
 - Modo claro (`data-theme="light"`) com tons de dourado escurecidos para manter contraste AA.
 - Monograma "CP" (sem reproduzir o leão do site). Foco visível em todos os controles; link "Pular para o conteúdo".
 
-## Integração Notion
+## Integração Notion (Notion → Central, somente leitura)
 
-`NotionAdapter` (`src/integrations/notion/adapter.ts`) define só leitura. Nesta fase existe apenas
-`mockNotionAdapter`, que retorna páginas fictícias marcadas como demonstração. A sincronização:
-1. lê tarefas, OKRs e reuniões; 2. usa o mapeamento de campos; 3. importa itens com instituição reconhecida;
-4. manda itens sem instituição para a **fila de revisão**; 5. ignora IDs já importados; 6. grava no **log**.
-A escrita está desativada; a chave de autorização exige confirmação e nenhuma operação de escrita foi implementada.
-A troca para MCP real é implementar um novo `NotionAdapter` com `kind: 'mcp'` e `isDemo: false`.
+Escopo: **Tarefas e KRs/OKRs de um responsável**, identificado pelo **ID estável do usuário no Notion** — nunca
+pelo nome. O ID do responsável e os IDs das bases ficam **só** em `settings.notion_config` (tela Integrações → Campos);
+não há valor padrão no código. Faltando qualquer um, a sincronização não roda (fail-closed). Reuniões não fazem parte da integração. Arquivos em `src/integrations/notion/`:
+
+| Arquivo | Papel |
+|---|---|
+| `config.ts` | Validação fail-closed da configuração, nomes das propriedades, mapeamentos aprovados de status/prioridade |
+| `adapter.ts` | Contrato somente leitura: propriedades tipadas, pessoas com ID, paginação, `last_edited_time`, filtro na origem |
+| `mockAdapter.ts` | Dados fictícios (selo "Demonstração") cobrindo todos os casos de escopo, valores desconhecidos e KRs |
+| `mapping.ts` | Conversões puras Notion → Central; valor fora do mapeamento nunca recebe padrão |
+| `hash.ts` | Estado canônico + SHA-256 dos campos sincronizados |
+| `plan.ts` | Planejador puro: barreira 2, identidade por `external_ref`, três vias, agrupamento de KRs, disjuntor |
+| `sync.ts` | Orquestra consulta → plano → gravação local; resolve itens da fila |
+
+Regras: (1) **barreira 1** — a consulta filtra pelo ID do responsável e pelos grupos de status ativos;
+**barreira 2** — cada página é validada de novo antes de qualquer gravação; páginas fora do escopo não geram item,
+revisão nem log com dados delas. (2) Identidade `external_ref = notion:<page_id>`; título nunca é identidade.
+(3) Itens do Notion têm `institution_id = null` e aparecem em qualquer filtro de instituição (`scopeMatchesItem`);
+registros normais seguem o filtro antigo. (4) Fila de revisão por `kind`: `valor_desconhecido`, `kr_sem_objetivo`,
+`kr_multiplos_objetivos`, `conflito`. (5) Três vias contra a base sincronizada: só o Notion mudou → aplica; só a
+Central → `pendente_push`; os dois → conflito, nada sobrescrito. (6) Item apagado na Central não é recriado;
+item que sumiu do Notion não é apagado na Central. (7) KRs são agrupados pelo Objetivo (base VISÃO); o título do
+Objetivo é somente leitura na Central porque a página é compartilhada.
+
+Banco: migration `0002_notion_sync.sql` (`notion_sync_state`, unicidade de `external_ref`, `review_queue.kind`,
+`sync_logs.external_id/fields_changed`, `settings.notion_config`). O token do Notion **nunca** fica no banco nem no
+frontend. A escrita (Central → Notion) e o adaptador real (API do Notion num componente servidor) são fases posteriores.

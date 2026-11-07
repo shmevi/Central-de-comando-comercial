@@ -2,7 +2,8 @@ import { CalendarClock, Star, Trash2 } from 'lucide-react';
 import type { Task } from '@/domain/types';
 import { PRIORITY, TASK_STATUS } from '@/domain/labels';
 import { InstitutionBadge } from '@/components/domain/Institution';
-import { DemoBadge } from '@/components/ui/misc';
+import { Badge, DemoBadge, NotionBadge } from '@/components/ui/misc';
+import { isFromNotion, isPersonalNotion } from '@/integrations/notion/mapping';
 import { fmtDate, todayISO } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { isOverdue } from './taskLogic';
@@ -25,7 +26,8 @@ export function TaskRow({ task, onOpen, onMission, onDelete, compact }: { task: 
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <span className={cn('chip', PRIORITY[task.priority].cls)}>{PRIORITY[task.priority].label}</span>
           {!compact && <span className="chip border-border text-muted">{TASK_STATUS[task.status]}</span>}
-          <InstitutionBadge id={task.institution_id} />
+          {isPersonalNotion(task) ? <Badge className="border-dashed">Pessoal</Badge> : <InstitutionBadge id={task.institution_id} />}
+          {isFromNotion(task) && <NotionBadge />}
           {task.due_date && <span className={cn('chip border-border', late ? 'text-danger border-danger/60' : 'text-muted')}><CalendarClock size={12} aria-hidden />{late ? 'Atrasada · ' : ''}{fmtDate(task.due_date)}</span>}
           {task.checklist.length > 0 && <span className="chip border-border text-muted">{task.checklist.filter((c) => c.done).length}/{task.checklist.length}</span>}
           {task.is_demo && <DemoBadge />}

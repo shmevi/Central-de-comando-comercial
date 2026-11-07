@@ -74,7 +74,7 @@ describe('WhatsApp', () => {
 import { validateWorkday } from './workday';
 import { safeHttpUrl } from './utils';
 import { checkPin, hashPin } from './pin';
-import { isoDate, reviewReason } from '@/integrations/notion/sync';
+import { isoDay } from '@/integrations/notion/mapping';
 
 describe('validações da revisão', () => {
   it('jornada fora de ordem é recusada', () => {
@@ -94,14 +94,10 @@ describe('validações da revisão', () => {
     expect(await checkPin('1234', h)).toBe(true);
     expect(await checkPin('0000', h)).toBe(false);
   });
-  it('Notion: datas inválidas viram null e reunião sem data vai para revisão', () => {
-    expect(isoDate('2026-11-06T10:00:00.000Z')).toBe('2026-11-06');
-    expect(isoDate('06/11/2026')).toBeNull();
-    expect(isoDate('2026-02-30')).toBeNull();
-    const insts = [{ id: 'i1', code: 'CPPEM', name: 'CPPEM', color: '', active: true, created_at: '', updated_at: '' }];
-    const map = { title: 'Título', date: 'Data', institution: 'Instituição' };
-    expect(reviewReason('reunioes', { id: 'r', properties: { Título: 'R', Data: null, Instituição: 'cppem' } }, map, insts)).toBe('Reunião sem data válida');
-    expect(reviewReason('reunioes', { id: 'r', properties: { Título: 'R', Data: '2026-11-06', Instituição: 'CPPEM' } }, map, insts)).toBeNull();
-    expect(reviewReason('tarefas', { id: 't', properties: { Instituição: null } }, map, insts)).toBe('Sem instituição reconhecida');
+  it('Notion: datas inválidas viram null (nunca uma data inventada)', () => {
+    expect(isoDay('2026-11-06T10:00:00.000Z')).toBe('2026-11-06');
+    expect(isoDay('06/11/2026')).toBeNull();
+    expect(isoDay('2026-02-30')).toBeNull();
+    expect(isoDay(null)).toBeNull();
   });
 });

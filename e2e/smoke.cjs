@@ -133,12 +133,26 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
 
   // Notion mock
   await p.goto(BASE + '/integracoes');
-  await p.click('text=Ativar leitura (tarefas, OKRs e reuniões)');
+  await p.click('text=Ativar leitura (tarefas e OKRs)');
   await p.click('role=dialog >> button:has-text("Ativar leitura")');
-  await p.click('button:has-text("Sincronizar")'); await p.waitForTimeout(2500);
+  ok(await p.locator('text=Configuração incompleta').count() === 1, 'sem IDs configurados a sincronização fica bloqueada (fail-closed)');
+  ok(await p.locator('button:has-text("Sincronizar")').isDisabled(), 'botão de sincronizar desativado sem configuração');
+  await p.click('role=radio[name="Campos"]');
+  await p.click('button:has-text("Usar IDs de demonstração")');
+  await p.waitForSelector('text=Configuração salva');
+  await p.click('role=radio[name="Conexão"]');
+  await p.click('button:has-text("Sincronizar")'); await p.waitForSelector('text=Leitura concluída', { timeout: 15000 });
   await p.click('role=radio[name^="Revisão"]');
-  ok(await p.locator('text=Item sem instituição definida').count() === 1, 'item sem instituição vai para fila de revisão');
-  ok(await p.locator('li:has-text("Reunião importada") >> text=Reunião sem data válida').count() === 1, 'reunião sem data vai para revisão (não recebe data inventada)');
+  ok(await p.locator('text=Status desconhecido: "Backlog"').count() === 1, 'status desconhecido vai para revisão (sem valor padrão)');
+  ok(await p.locator('li:has-text("KR sem objetivo") >> text=KR sem Objetivo').count() >= 1, 'KR sem Objetivo vai para revisão (sem Objetivo artificial)');
+  ok(await p.locator('text=Tarefa de outra pessoa').count() === 0, 'item de outra pessoa não aparece nem na revisão');
+  // Itens pessoais do Notion aparecem mesmo com filtro de instituição
+  await p.goto(BASE + '/tarefas');
+  await p.selectOption('select[aria-label="Filtrar por instituição"]', { label: 'CPPEM' });
+  await p.waitForSelector('text=[Demonstração] Revisar funil de matrículas');
+  ok(await p.locator('li:has-text("Revisar funil de matrículas") >> text=Notion').count() === 1, 'tarefa do Notion com selo e visível no filtro CPPEM');
+  ok(await p.locator('text=Tarefa de outra pessoa').count() === 0, 'tarefa de outra pessoa não importada');
+  await p.selectOption('select[aria-label="Filtrar por instituição"]', 'all');
 
   // Relatórios: exportar CSV
   await p.goto(BASE + '/relatorios'); await p.waitForSelector('text=Tarefas concluídas');

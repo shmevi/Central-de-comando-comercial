@@ -65,4 +65,8 @@ export async function removeDemo() {
     const items = await repo(c).list();
     for (const i of items.filter((x) => x.is_demo)) await actions.remove(c, i.id);
   }
+  // Estado de sincronização dos itens de demonstração. Tolerante: a tabela só existe depois da migration 0002.
+  try {
+    for (const s of (await repo('notion_sync_state').list()).filter((x) => x.is_demo)) await actions.remove('notion_sync_state', s.id);
+  } catch { /* sem a 0002 não há estado para limpar */ }
 }

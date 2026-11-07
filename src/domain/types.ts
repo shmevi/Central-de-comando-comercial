@@ -207,7 +207,17 @@ export interface Improvement extends BaseEntity {
   impact: string;
 }
 
-export interface KeyResult { id: ID; title: string; start: number | null; target: number | null; current: number | null; unit: string }
+export interface KeyResult {
+  id: ID; title: string; start: number | null; target: number | null; current: number | null; unit: string;
+  /** KR vindo do Notion: notion:<id da página do KR>. Ausente em KRs criados na Central. */
+  external_ref?: string | null;
+  /** Status exatamente como está no Notion (a Central não tem status próprio de KR). */
+  status?: string | null;
+  period_start?: string | null; // yyyy-mm-dd
+  period_end?: string | null;
+  /** Progresso calculado pelo Notion (0–100). Somente leitura: nunca é escrito de volta. */
+  notion_progress?: number | null;
+}
 
 export interface Objective extends BaseEntity {
   title: string;
@@ -239,18 +249,65 @@ export interface SyncLog extends BaseEntity {
   status: 'sucesso' | 'erro' | 'revisao';
   message: string;
   is_demo_source: boolean;
+  /** Página do Notion a que o registro se refere (só de itens dentro do escopo). */
+  external_id?: string | null;
+  fields_changed?: string[] | null;
 }
+
+/** Entidades da integração. 'okrs' e 'reunioes' existem só em registros antigos da demonstração. */
+export type NotionSyncEntity = 'tarefas' | 'krs' | 'objetivos';
+export type ReviewKind = 'conflito' | 'kr_multiplos_objetivos' | 'kr_sem_objetivo' | 'valor_desconhecido' | 'instituicao' | 'reuniao_sem_data';
+export type ReviewResolution = 'importado' | 'descartado' | 'manter_notion' | 'manter_central' | 'objetivo_escolhido';
 
 export interface ReviewQueueItem extends BaseEntity {
   source: 'notion';
-  entity: 'tarefas' | 'okrs' | 'reunioes';
+  entity: NotionSyncEntity | 'okrs' | 'reunioes';
+  /** Motivo estruturado. Registros antigos sem este campo são tratados como 'instituicao' (legado). */
+  kind: ReviewKind;
   external_id: string;
   title: string;
   payload: Record<string, unknown>;
-  /** Por que o item não foi importado direto (ex.: sem instituição, reunião sem data). */
+  /** Explicação legível do motivo. */
   reason: string;
   resolved: boolean;
-  resolution: 'importado' | 'descartado' | null;
+  resolution: ReviewResolution | null;
+}
+
+export type SyncStatus = 'ok' | 'pendente_push' | 'conflito' | 'revisao' | 'suspenso' | 'fora_do_escopo' | 'removido_no_notion' | 'removido_na_central';
+
+/** Estado de sincronização de UMA página do Notion (tarefa, KR ou objetivo). */
+export interface NotionSyncState extends BaseEntity {
+  entity: NotionSyncEntity;
+  /** Registro local. Para KR: id do KR dentro de objective.key_results. */
+  local_id: string | null;
+  /** KR: id do objective local que contém o KR. */
+  local_parent_id: string | null;
+  notion_page_id: string;
+  /** KR: página do Objetivo (VISÃO) no Notion. */
+  notion_parent_id: string | null;
+  /** KR com vários Objetivos: Objetivo escolhido na revisão. */
+  pinned_parent_id: string | null;
+  synced_hash: string | null;
+  synced_snapshot: Record<string, unknown> | null;
+  last_notion_edited_time: string | null;
+  last_central_updated_at: string | null;
+  last_synced_at: string | null;
+  last_change_origin: 'notion' | 'central' | null;
+  echo_edited_time: string | null;
+  sync_status: SyncStatus;
+  write_count_window: number;
+  write_window_started_at: string | null;
+}
+
+/** Configuração da integração (sem segredos — o token nunca fica aqui). */
+export interface NotionConfig {
+  person_id: string;
+  person_name: string;
+  tasks_data_source_id: string;
+  krs_data_source_id: string;
+  objectives_data_source_id: string;
+  cursors: Partial<Record<NotionSyncEntity, string | null>>;
+  last_sync_at: string | null;
 }
 
 export interface Settings extends BaseEntity {
@@ -265,7 +322,10 @@ export interface Settings extends BaseEntity {
   weekly_focus: Record<string, string>; // "1".."5"
   notion_enabled: boolean;
   notion_write_enabled: boolean;
+  /** Legado (mapeamento editável da demonstração). A integração usa os nomes fixos de integrations/notion/config.ts. */
   notion_mapping: Record<string, Record<string, string>>;
+  /** Pode faltar em configurações salvas antes da migration 0002: use resolveNotionConfig(). */
+  notion_config?: Partial<NotionConfig>;
   display_name: string;
   permissions: { feedbacks_restricted: boolean; feedback_pin: string };
 }
@@ -289,6 +349,7 @@ export interface EntityMap {
   projects: Project;
   sync_logs: SyncLog;
   review_queue: ReviewQueueItem;
+  notion_sync_state: NotionSyncState;
   settings: Settings;
 }
 
@@ -296,5 +357,5 @@ export type Collection = keyof EntityMap;
 export const COLLECTIONS: Collection[] = [
   'institutions', 'tasks', 'routine_templates', 'routine_blocks', 'agenda_events', 'notes',
   'people', 'feedbacks', 'candidates', 'interviews', 'trainings', 'meetings', 'systems',
-  'improvements', 'objectives', 'projects', 'sync_logs', 'review_queue', 'settings',
+  'improvements', 'objectives', 'projects', 'sync_logs', 'review_queue', 'notion_sync_state', 'settings',
 ];

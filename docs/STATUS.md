@@ -17,8 +17,10 @@
     Ainda **não** rodou contra um projeto Supabase de verdade, porque nenhum foi criado ou conectado.
 
 ## Demonstração (fictício, sempre identificado)
-- **Integração Notion**: adaptador *mock*. Nenhum workspace real é acessado e não existe escrita.
-  Itens importados recebem o selo "Demonstração".
+- **Integração Notion**: lógica completa de leitura Notion → Central (filtro pelo responsável em duas barreiras,
+  mapeamentos, deduplicação, conflitos, agrupamento de KRs) rodando sobre um adaptador *mock*. Nenhum workspace real é
+  acessado e não existe escrita. Itens importados recebem o selo "Demonstração". A migration `0002_notion_sync.sql`
+  existe no repositório mas **não foi aplicada** em nenhum Supabase.
 - **"Carregar demonstração"** (Configurações): pessoas, feedback, candidatos, OKR e sistema fictícios com selo
   "Demonstração", removíveis com um clique. Por padrão o app inicia **sem** dados fictícios.
 
@@ -32,6 +34,7 @@
 - Cada pessoa que entra tem o próprio espaço de dados. Não há tela para administrar usuários dentro do app:
   usuários são criados e removidos no painel do Supabase (Authentication → Users).
 - Arrastar e soltar nos Kanbans usa HTML5 drag (desktop); no celular e por teclado use o seletor "Mover".
-- Adaptador Notion real via MCP: implementar `NotionAdapter` com `kind: 'mcp'` (somente leitura primeiro).
+- Adaptador Notion real: implementar `NotionAdapter` (somente leitura) num componente servidor com a API do Notion,
+  convertendo a fórmula `Progresso` para 0–100 (o formato real da fórmula ainda não foi verificado — a leitura via MCP não devolve o valor).
 - Os arquivos anexos citados no pedido (`prompt-central-comando-comercial.md` e `0001_central_comando.sql`) não
   estavam no repositório; o esquema foi escrito a partir do texto do pedido. Se houver diferenças, posso conciliar.

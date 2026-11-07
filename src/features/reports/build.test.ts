@@ -14,6 +14,15 @@ describe('relatórios', () => {
     const rows = buildReport(['2026-11-05'], { ...empty, routine_blocks: [b] }, '2026-11-05', '15:00', (id) => id === 'inst-x');
     expect(rows.find((r) => r.indicator === 'Blocos concluídos')!.value).toBe(1);
   });
+  it('tarefa pessoal do Notion não é pendência de classificação e entra em qualquer escopo', () => {
+    const base = { created_at: '2026-11-05T15:00:00.000Z', updated_at: '', description: '', priority: 'alta' as const, status: 'a_fazer' as const, due_date: null, category: 'Geral', checklist: [], recurrence: 'nenhuma' as const, is_mission: false, mission_date: null, completed_at: null, history: [] };
+    const notion = { ...base, id: 'n', title: 'Do Notion', institution_id: null, external_ref: 'notion:abc' };
+    const solta = { ...base, id: 's', title: 'Sem instituição', institution_id: null, external_ref: null };
+    const all = buildReport(['2026-11-05'], { ...empty, tasks: [notion, solta] }, '2026-11-05', '15:00', () => true);
+    expect(all.find((r) => r.indicator === 'Tarefas sem instituição')!.value).toBe(1);
+    const scoped = buildReport(['2026-11-05'], { ...empty, tasks: [notion, solta] }, '2026-11-05', '15:00', (id) => id === 'inst-x');
+    expect(scoped.find((r) => r.indicator === 'Tarefas criadas')!.value).toBe(1); // só a do Notion
+  });
   it('CSV neutraliza fórmulas', () => {
     expect(csvSafe('=HYPERLINK("x")')).toBe(`'=HYPERLINK("x")`);
     expect(csvSafe('-1')).toBe(`'-1`);
