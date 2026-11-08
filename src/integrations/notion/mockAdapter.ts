@@ -1,6 +1,6 @@
 import type { NotionConfig } from '@/domain/types';
-import type { NotionAdapter, NotionPage, NotionPropertyValue, NotionQuery, NotionSource } from './adapter';
-import { PROPS, normalizePageId, normalizeUserId } from './config';
+import type { NotionPage, NotionPropertyValue, NotionQuery, NotionSource, NotionWriteAdapter } from './adapter';
+import { KR_STATUS_OPTIONS, PROPS, TASK_STATUS_MAP, normalizePageId, normalizeUserId } from './config';
 
 /**
  * ADAPTADOR DE DEMONSTRAÇÃO. Não conecta a nenhum workspace real.
@@ -41,10 +41,11 @@ const num = (value: number | null): NotionPropertyValue => ({ type: 'number', va
 const rel = (...ids: string[]): NotionPropertyValue => ({ type: 'relation', ids });
 const EDIT = '2026-11-07T12:00:00.000Z';
 
-function task(pid: string, name: string, who: string[], st: [string, 'to_do' | 'in_progress' | 'complete'], prio: string | null, due: string | null): NotionPage {
+function task(pid: string, name: string, who: string[], st: [string, 'to_do' | 'in_progress' | 'complete'], prio: string | null, due: string | null, attr: string[] = []): NotionPage {
   return { id: pid, last_edited_time: EDIT, parent_data_source_id: MOCK_NOTION_CONFIG.tasks_data_source_id, properties: {
     [T.title]: title(`[Demonstração] ${name}`), [T.responsible]: people(...who), [T.status]: status(...st),
     [T.priority]: select(prio), [T.due_date]: date(due), [T.last_edited]: { type: 'last_edited_time', value: EDIT },
+    [T.attribution]: { type: 'multi_select', names: attr },
   } };
 }
 function kr(pid: string, name: string, who: string[], objectives: string[], st: [string, 'to_do' | 'in_progress' | 'complete'], target: number | null, current: number | null, period: [string, string] | null, progress: number | null): NotionPage {
@@ -59,13 +60,13 @@ const M = MOCK_PEOPLE.responsavel, O = MOCK_PEOPLE.outra, I = MOCK_IDS;
 export function mockData(): Record<NotionSource, NotionPage[]> {
   return {
     tarefas: [
-      task(I.t_responsavel, 'Revisar funil de matrículas', [M], ['Não iniciada', 'to_do'], 'Importante e Urgente', '2026-11-10'),
-      task(I.t_responsavel_e_outra, 'Atualizar playbook com a equipe', [O, M], ['Em andamento', 'in_progress'], 'Importante e Não Urgente', null),
+      task(I.t_responsavel, 'Revisar funil de matrículas', [M], ['Não iniciada', 'to_do'], 'Importante e Urgente', '2026-11-10', ['70%']),
+      task(I.t_responsavel_e_outra, 'Atualizar playbook com a equipe', [O, M], ['Em andamento', 'in_progress'], 'Importante e Não Urgente', null, ['20%']),
       task(I.t_so_outra, 'Tarefa de outra pessoa', [O], ['Não iniciada', 'to_do'], 'Importante e Urgente', null),
       task(I.t_sem_responsavel, 'Tarefa sem responsável', [], ['Não iniciada', 'to_do'], 'Importante e Urgente', null),
       task(I.t_status_desconhecido, 'Status novo no Notion', [M], ['Backlog', 'to_do'], 'Importante e Urgente', null),
       task(I.t_prioridade_desconhecida, 'Prioridade fora da matriz', [M], ['Não iniciada', 'to_do'], 'P1', null),
-      task(I.t_pausada, 'Tarefa pausada', [M], ['Pausada', 'in_progress'], 'Não importante e Não Urgente', '2026-11-20'),
+      task(I.t_pausada, 'Tarefa pausada', [M], ['Pausada', 'in_progress'], 'Não importante e Não Urgente', '2026-11-20', ['70%', '10%']),
       task(I.t_concluida, 'Tarefa concluída (fora do escopo inicial)', [M], ['Concluída', 'complete'], 'Não importante e Urgente', null),
     ],
     krs: [
@@ -100,7 +101,7 @@ const clone = (p: NotionPage): NotionPage => JSON.parse(JSON.stringify(p));
  * `leaky: true` simula uma origem que NÃO aplicou o filtro (bug ou mudança na API),
  * para provar que a barreira 2 do sincronizador segura sozinha.
  */
-export function createMockNotionAdapter(opts: { leaky?: boolean; data?: Record<NotionSource, NotionPage[]>; delayMs?: number; pageSize?: number } = {}): NotionAdapter {
+export function createMockNotionAdapter(opts: { leaky?: boolean; data?: Record<NotionSource, NotionPage[]>; delayMs?: number; pageSize?: number; now?: () => string } = {}): NotionWriteAdapter {
   const data = opts.data ?? mockData();
   const wait = () => (opts.delayMs ? new Promise((r) => setTimeout(r, opts.delayMs)) : Promise.resolve());
   return {
@@ -120,10 +121,26 @@ export function createMockNotionAdapter(opts: { leaky?: boolean; data?: Record<N
     },
     async retrieve(source, ids) {
       await wait();
-      const want = new Set(ids);
+      const want = new Set(ids.map(normalizePageId));
       return data[source].filter((p) => want.has(p.id)).map(clone);
+    },
+    async statusOptions(source) {
+      return source === 'tarefas' ? Object.keys(TASK_STATUS_MAP) : [...KR_STATUS_OPTIONS];
+    },
+    /** Escrita de DEMONSTRAÇÃO: altera só os dados fictícios em memória (nenhum workspace real). */
+    async update(source, pageId, properties) {
+      await wait();
+      const page = data[source].find((p) => p.id === normalizePageId(pageId));
+      if (!page) throw Object.assign(new Error('Página não encontrada (demonstração).'), { status: 404 });
+      for (const [k, v] of Object.entries(properties)) {
+        const cur = page.properties[k];
+        page.properties[k] = v.type === 'status' ? { type: 'status', name: v.name, group: cur?.type === 'status' ? cur.group : null }
+          : v.type === 'title' ? { type: 'title', text: v.text } : v;
+      }
+      page.last_edited_time = opts.now ? opts.now() : new Date().toISOString();
+      return clone(page);
     },
   };
 }
 
-export const mockNotionAdapter: NotionAdapter = createMockNotionAdapter({ delayMs: 300, pageSize: 3 });
+export const mockNotionAdapter: NotionWriteAdapter = createMockNotionAdapter({ delayMs: 300, pageSize: 3 });

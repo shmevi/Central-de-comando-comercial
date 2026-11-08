@@ -67,7 +67,14 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
 
   // Kanban: mover para "Concluída" grava a conclusão (reaparece como "Reabrir" na lista)
   await p.click('role=radio[name="Kanban"]'); await p.waitForTimeout(200);
-  ok(await p.locator('section[aria-label="Em andamento"]').count() === 1, 'kanban renderiza');
+  // Padrão igual ao hub do Notion: colunas por ATRIBUIÇÃO; sem atribuição cai em "Sem atribuição"
+  ok(await p.locator('section[aria-label="70%"]').count() === 1 && await p.locator('section[aria-label="OFF WORK (INDIVIDUAL)"]').count() === 1, 'kanban de tarefas por atribuição (como no Notion)');
+  await p.getByRole('combobox', { name: 'Mover Confirmar entrevistas e preparar avaliação para' }).selectOption('70%');
+  await p.waitForTimeout(300);
+  ok(await p.locator('section[aria-label="70%"] li:has-text("Confirmar entrevistas")').count() === 1, 'mover para a coluna 70% define a atribuição');
+  ok(await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:tasks') || '[]').find((t) => t.title.startsWith('Confirmar entrevistas'))?.attribution?.[0]) === '70%', 'atribuição gravada na tarefa');
+  await p.click('role=radio[name="Status"]'); await p.waitForTimeout(200);
+  ok(await p.locator('section[aria-label="Não iniciada"]').count() === 1 && await p.locator('section[aria-label="Pausada"]').count() === 1, 'kanban por status com os nomes do Notion');
   await p.getByRole('combobox', { name: 'Mover Confirmar entrevistas e preparar avaliação para' }).selectOption('concluida');
   await p.waitForTimeout(300);
   await p.click('role=radio[name="Lista"]'); await p.waitForTimeout(200);
@@ -155,6 +162,27 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   ok(await p.locator('li:has-text("Tarefa E2E")').count() === 1 && await p.locator('li:has-text("Revisar funil de matrículas")').count() === 0, 'filtro Central esconde as do Notion');
   await p.click('role=radio[name^="Todas"]');
   ok(await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:tasks') || '[]').length) === totalAntes, 'filtrar não cria nem apaga tarefas');
+
+  // OKRs: "Kanban por Objetivo" como no Notion (colunas = Objetivos, só KRs ativos), status no cartão e envio com confirmação
+  await p.goto(BASE + '/okrs'); await p.waitForSelector('text=Kanban por Objetivo');
+  ok(await p.locator('section[aria-label="[Demonstração] Objetivo compartilhado"]').count() === 1, 'OKRs: uma coluna por Objetivo');
+  ok(await p.locator('section[aria-label] li:has-text("KR normal")').count() === 1, 'KR ativo aparece no quadro');
+  await p.getByRole('combobox', { name: 'Status de [Demonstração] KR normal' }).selectOption('Não Atingiu - Faltou Pessoas');
+  await p.waitForSelector('text=ainda não estão no Notion');
+  ok(await p.locator('section[aria-label] li:has-text("KR normal")').count() === 0, 'KR encerrado sai do quadro (só ativos, como no Notion)');
+  await p.click('text=Mostrar KRs encerrados'); await p.waitForTimeout(150);
+  ok(await p.locator('section[aria-label] li:has-text("KR normal")').count() === 1, '"Mostrar encerrados" traz o KR de volta');
+  await p.click('button:has-text("Revisar e enviar ao Notion")');
+  ok(await p.locator('role=dialog >> text=Status:').count() >= 1 && await p.locator('role=dialog >> text=Não Atingiu - Faltou Pessoas').count() >= 1, 'confirmação mostra o que vai mudar no Notion');
+  ok(await p.locator('role=dialog >> button:has-text("Enviar 1 ao Notion")').isDisabled(), 'sem a escrita autorizada o envio fica bloqueado');
+  await p.keyboard.press('Escape');
+  await p.goto(BASE + '/integracoes');
+  await p.click('text=Autorizar escrita no Notion'); await p.click('role=dialog >> button:has-text("Autorizo")');
+  await p.goto(BASE + '/okrs'); await p.click('button:has-text("Revisar e enviar ao Notion")');
+  await p.click('role=dialog >> button:has-text("Enviar 1 ao Notion")');
+  ok(await p.locator('text=Notion (demonstração): 1 enviada(s)').waitFor({ timeout: 8000 }).then(() => true, () => false), 'envio confirmado grava no Notion (demonstração)');
+  ok(await p.locator('text=ainda não estão no Notion').count() === 0, 'depois do envio não sobra pendência');
+  ok(await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:sync_logs') || '[]').some((l) => l.direction === 'escrita' && l.status === 'sucesso')), 'log registra a escrita');
 
   // Relatórios: conquista registrada fica salva; CSV e PDF
   await p.goto(BASE + '/relatorios'); await p.waitForSelector('text=Tarefas concluídas');

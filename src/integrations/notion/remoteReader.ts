@@ -1,11 +1,14 @@
 /**
  * Leitura REAL do Notion no modo Supabase: o navegador chama a Edge Function notion-sync (modo "read").
  * O token do Notion fica só no servidor; aqui só passa a sessão do usuário (JWT), como em qualquer chamada.
- * Nada aqui escreve no Notion. A gravação na Central é feita depois, por sync.ts, com a sessão do usuário (RLS).
+ * A leitura não escreve no Notion; a gravação na Central é feita depois, por sync.ts, com a sessão do usuário (RLS).
+ * O envio (createRemoteNotionWriter) só acontece depois da confirmação explícita na tela.
  */
 import type { NotionPage } from './adapter';
 import type { NotionRead } from './pipeline';
 import type { NotionReader } from './sync';
+import type { NotionWriter } from './push';
+import type { PushResult } from './pushCore';
 
 /** Mesmo formato de `supabase.functions.invoke` (injetado para os testes). */
 export type InvokeFn = (name: string, opts: { body: Record<string, unknown> }) => Promise<{ data: unknown; error: unknown }>;
@@ -41,6 +44,23 @@ export function createRemoteNotionReader(invoke: InvokeFn): NotionReader {
       const missing = Array.isArray(r.missing) ? r.missing.filter((x): x is string => typeof x === 'string') : [];
       const counts = r.counts ?? { tarefas: { consulta: r.tarefas.length, rastreadas: 0 }, krs: { consulta: r.krs.length, rastreadas: 0 }, objetivos: r.objetivos.length };
       return { person_id: d.person_id, read: { tarefas: r.tarefas, krs: r.krs, objetivos: r.objetivos, missing, counts } };
+    },
+  };
+}
+
+/**
+ * Envio REAL ao Notion (modo Supabase): a Edge Function, modo "push", valida e grava — o token fica no servidor.
+ * O servidor confere de novo a autorização de escrita, o vínculo da conta e o responsável de cada página.
+ */
+export function createRemoteNotionWriter(invoke: InvokeFn): NotionWriter {
+  return {
+    isDemo: false,
+    async push(changes) {
+      const { data, error } = await invoke('notion-sync', { body: { mode: 'push', changes } });
+      if (error) throw new Error(await serverMessage(error));
+      const d = data as { mode?: string; results?: unknown } | null;
+      if (!d || d.mode !== 'push' || !Array.isArray(d.results)) throw new Error('Resposta inesperada do servidor ao enviar ao Notion. Confira o log antes de tentar de novo.');
+      return d.results as PushResult[];
     },
   };
 }

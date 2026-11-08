@@ -22,7 +22,13 @@
 
 - **Integração Notion (modo Supabase)**: leitura REAL Notion → Central de Tarefas e KRs/OKRs ativos do responsável,
   pela Edge Function `notion-sync` (token só no servidor). Só para contas com vínculo em `notion_access`. Duas barreiras
-  de responsável, deduplicação, três vias/conflitos, agrupamento de KRs por Objetivo. **Nada é escrito no Notion.**
+  de responsável, deduplicação, três vias/conflitos, agrupamento de KRs por Objetivo.
+- **Envio Central → Notion** (modo Supabase; demonstração no modo local): mudanças feitas na Central em tarefas
+  (título, status, prioridade, prazo, atribuição) e KRs (título, status, meta, atual) ficam pendentes e só vão ao Notion
+  com "Autorizar escrita no Notion" ligado e confirmação explícita a cada envio. O servidor confere responsável,
+  base e valores; se o Notion mudou o mesmo campo, vira conflito (nada é sobrescrito).
+- **Quadros iguais aos do Notion**: OKRs em "Kanban por Objetivo" (colunas = Objetivos, só KRs ativos, status no cartão)
+  e Tarefas agrupadas por ATRIBUIÇÃO (70% / 20% / 10% / OFF WORK, só ativas) ou por status com os nomes do Notion.
 
 ## Demonstração (fictício, sempre identificado)
 - **Integração Notion no modo local**: a mesma lógica roda sobre um adaptador *mock*; itens recebem o selo "Demonstração".
@@ -40,7 +46,7 @@
 - Cada pessoa que entra tem o próprio espaço de dados. Não há tela para administrar usuários dentro do app:
   usuários são criados e removidos no painel do Supabase (Authentication → Users).
 - Arrastar e soltar nos Kanbans usa HTML5 drag (desktop); no celular e por teclado use o seletor "Mover".
-- Notion: a escrita Central → Notion ainda não existe (mudanças feitas na Central ficam "pendentes de envio").
+- Notion: criar páginas novas (tarefa ou KR criados na Central) e mudar o Objetivo de um KR ainda não são enviados.
   A fórmula `Progresso` só é convertida para 0–100 quando confere com Meta/Atual; senão o progresso é calculado na Central.
 - Os arquivos anexos citados no pedido (`prompt-central-comando-comercial.md` e `0001_central_comando.sql`) não
   estavam no repositório; o esquema foi escrito a partir do texto do pedido. Se houver diferenças, posso conciliar.

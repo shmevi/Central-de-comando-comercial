@@ -2,7 +2,13 @@ import * as React from 'react';
 import { Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
-import { PageHeader, Loading, ErrorState, EmptyState, Card, Badge, DemoBadge, NotionBadge, Progress } from '@/components/ui/misc';
+import { PageHeader, Loading, ErrorState, EmptyState, Card, Badge, DemoBadge, NotionBadge, Progress, Segmented, FilterBar } from '@/components/ui/misc';
+import { KanbanBoard } from '@/components/ui/kanban';
+import { PushBanner } from '@/features/notion/PushPanel';
+import { KR_STATUS, KR_STATUS_OPTIONS, krColumnOf, type KrColumn } from '@/integrations/notion/config';
+import { TONE_RGB, krStatusTone, toneChip } from '@/features/notion/notionLook';
+import { Checkbox } from '@/components/ui/form';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useDraft } from '@/components/ui/use-draft';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
@@ -88,20 +94,150 @@ function ObjectiveDialog({ open, onOpenChange, item }: { open: boolean; onOpenCh
   );
 }
 
+/** Colunas ("tópicos") do Kanban: os grupos de status da base de KRs do Notion. */
+const KR_COLUMNS: { value: KrColumn; label: string; tone: string }[] = [
+  { value: 'a_caminho', label: 'A caminho', tone: TONE_RGB.blue },
+  { value: 'em_analise', label: '??', tone: TONE_RGB.blue },
+  { value: 'atingiu', label: 'Concluído (Atingiu)', tone: TONE_RGB.green },
+  { value: 'nao_atingiu', label: 'Não Atingiu', tone: TONE_RGB.red },
+];
+const isActiveKr = (k: KeyResult) => ['a_caminho', 'em_analise'].includes(krColumnOf(k.status));
+const COLUMN_STATUS: Record<Exclude<KrColumn, 'nao_atingiu'>, string> = { a_caminho: KR_STATUS.a_caminho, em_analise: KR_STATUS.em_analise, atingiu: KR_STATUS.atingiu };
+type KrCard = { id: string; o: Objective; k: KeyResult };
+type View = 'objetivos' | 'kanban' | 'lista';
+
+/** Grava um KR dentro do objetivo (KRs ficam em objectives.key_results). */
+async function saveKr(o: Objective, krId: string, patch: Partial<KeyResult>) {
+  await actions.update('objectives', o.id, { key_results: o.key_results.map((k) => (k.id === krId ? { ...k, ...patch } : k)) });
+}
+
+/** Edição rápida de um KR (título, meta, atual e status). KR do Notion: a mudança fica pendente de envio. */
+function KrDialog({ card, onOpenChange, statusOnly }: { card: KrCard | null; onOpenChange: (o: boolean) => void; statusOnly?: string | null }) {
+  const toast = useToast();
+  const open = !!card;
+  const { d, set, err, setErr } = useDraft(open, () => card ? { title: card.k.title, target: card.k.target, current: card.k.current, status: statusOnly ?? card.k.status ?? KR_STATUS.a_caminho } : { title: '', target: null, current: null, status: KR_STATUS.a_caminho as string }, [card, statusOnly]);
+  if (!card) return null;
+  const options = statusOnly != null ? KR_STATUS.nao_atingiu.map((s) => ({ value: s, label: s.replace(/^Não Atingiu - /, '') })) : KR_STATUS_OPTIONS.map((s) => ({ value: s, label: s }));
+  async function save() {
+    const e: Record<string, string> = {};
+    if (!d.title.trim()) e.title = 'Informe o KR.';
+    if ([d.target, d.current].some((n) => n != null && !Number.isFinite(n))) e.num = 'Valor numérico inválido.';
+    if (!KR_STATUS_OPTIONS.includes(d.status ?? '')) e.status = 'Escolha um status.';
+    setErr(e); if (Object.keys(e).length) return;
+    try {
+      await saveKr(card!.o, card!.k.id, { title: d.title.trim(), target: d.target, current: d.current, status: d.status });
+      toast(card!.k.external_ref ? 'KR salvo na Central. Envie ao Notion pelo aviso no topo da página.' : 'KR salvo.');
+      onOpenChange(false);
+    } catch (er) { toast((er as Error).message, 'erro'); }
+  }
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} title={statusOnly != null ? 'Por que não atingiu?' : 'Atualizar KR'} description={card.o.title}
+      badge={card.k.external_ref ? <NotionBadge /> : undefined}
+      footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save}>Salvar</Button></>}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {statusOnly == null && <>
+          <TextField className="sm:col-span-2" label="KR" value={d.title} onChange={(e) => set('title', e.target.value)} error={err.title} />
+          <TextField label="Meta" inputMode="decimal" value={d.target ?? ''} onChange={(e) => set('target', num(e.target.value))} />
+          <TextField label="Atual" inputMode="decimal" value={d.current ?? ''} onChange={(e) => set('current', num(e.target.value))} error={err.num} />
+        </>}
+        <SelectField className="sm:col-span-2" label={statusOnly != null ? 'Motivo (status no Notion)' : 'Status'} value={d.status ?? ''} onChange={(e) => set('status', e.target.value)} options={options} error={err.status} />
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * Cartão como no Notion ("Kanban por Objetivo"): KR, Dono, Período, Progresso e Status.
+ * No quadro por objetivo o status muda ali mesmo, pelo seletor (no Notion, editando a propriedade do cartão).
+ */
+function KrCardView({ c, onEdit, showObjective, onStatus }: { c: KrCard; onEdit: () => void; showObjective?: boolean; onStatus?: (s: string) => void }) {
+  const { k, o } = c;
+  const kp = krProgress(k);
+  const pv = kp ?? k.notion_progress ?? null;
+  const tone = krStatusTone(k.status);
+  return (
+    <div className="space-y-2 pr-4">
+      <button type="button" onClick={onEdit} className="text-left text-sm font-medium leading-snug hover:text-gold">{k.title}</button>
+      {showObjective && <div className="truncate text-[11px] text-muted" title={o.title}>{o.title}</div>}
+      <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted">
+        {o.owner && <span className="chip border-border" title="Dono">{o.owner}</span>}
+        <span className="chip border-border" title="Período">{period(k) ?? 'Sem período'}</span>
+        {k.external_ref && <NotionBadge />}{o.is_demo && <DemoBadge />}
+      </div>
+      <div className="flex items-center justify-between text-xs"><span className="text-muted">{k.target != null ? `${k.current ?? '—'} / ${k.target} ${k.unit}` : 'meta não definida'}</span><span className="text-gold" title="Progresso">{pv != null ? `${pv}%` : '—'}</span></div>
+      {pv != null && <Progress className="h-1.5" value={pv} label={`Progresso de ${k.title}`} />}
+      {onStatus ? (
+        <label className="block">
+          <span className="sr-only">Status de {k.title}</span>
+          <select className={cn('field h-7 rounded-lg px-2 py-0 text-[11px]', toneChip(tone))} value={k.status ?? KR_STATUS.a_caminho} onChange={(e) => onStatus(e.target.value)}>
+            {[...new Set([...(k.status && !KR_STATUS_OPTIONS.includes(k.status) ? [k.status] : []), ...KR_STATUS_OPTIONS])].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+      ) : <span className={cn('chip text-[11px]', toneChip(tone))}>{k.status ?? KR_STATUS.a_caminho}</span>}
+    </div>
+  );
+}
+
 export default function Okrs() {
   const objectives = useCollection('objectives');
   const { matchesItem } = useScope();
   const { confirmDelete, confirmNode } = useConfirm();
+  const toast = useToast();
   const [cycle, setCycle] = React.useState('');
+  const [objFilter, setObjFilter] = React.useState('');
+  const [view, setView] = React.useState<View>(() => { try { const v = localStorage.getItem('ccc:okr-view'); return v === 'kanban' || v === 'lista' ? v : 'objetivos'; } catch { return 'objetivos'; } });
+  /** Como no Notion: só KRs ativos (A caminho / ??), a não ser que se peça o contrário. */
+  const [showClosed, setShowClosed] = React.useState(false);
+  React.useEffect(() => { try { localStorage.setItem('ccc:okr-view', view); } catch { /* */ } }, [view]);
   const [editing, setEditing] = React.useState<Objective | null>(null); const [creating, setCreating] = React.useState(false);
+  const [krEdit, setKrEdit] = React.useState<{ card: KrCard; statusOnly: string | null } | null>(null);
   const cycles = [...new Set(objectives.items.map((o) => o.cycle))].sort().reverse();
   const list = objectives.items.filter((o) => matchesItem(o)).filter((o) => !cycle || o.cycle === cycle);
+  const cards: KrCard[] = list.filter((o) => !objFilter || o.id === objFilter).flatMap((o) => o.key_results.map((k) => ({ id: `${o.id}:${k.id}`, o, k })));
+  const objCards = showClosed ? cards : cards.filter((c) => isActiveKr(c.k));
+  // Colunas = Objetivos em ordem alfabética, sem os vazios (hideEmptyGroups do Notion).
+  const objColumns = [...new Set(objCards.map((c) => c.o.id))].map((id) => list.find((o) => o.id === id)!)
+    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
+    .map((o) => ({ value: o.id, label: o.title, tone: isFromNotion(o) ? 'rgb(var(--gold-300))' : 'rgb(var(--muted))' }));
+  async function setStatus(c: KrCard, s: string) {
+    if (s === c.k.status) return;
+    try { await saveKr(c.o, c.k.id, { status: s }); toast(c.k.external_ref ? `“${c.k.title}” → ${s} na Central. Envie ao Notion pelo aviso no topo.` : 'Status do KR atualizado.'); }
+    catch (e) { toast((e as Error).message, 'erro'); }
+  }
+
+  async function move(id: string, to: KrColumn) {
+    const c = cards.find((x) => x.id === id); if (!c || krColumnOf(c.k.status) === to) return;
+    if (to === 'nao_atingiu') { setKrEdit({ card: c, statusOnly: KR_STATUS.nao_atingiu[0] }); return; } // pede o motivo
+    try {
+      await saveKr(c.o, c.k.id, { status: COLUMN_STATUS[to] });
+      toast(c.k.external_ref ? `“${c.k.title}” → ${COLUMN_STATUS[to]} na Central. Envie ao Notion pelo aviso no topo.` : 'Status do KR atualizado.');
+    } catch (e) { toast((e as Error).message, 'erro'); }
+  }
+
+  const empty = <EmptyState icon={<Target />} title="Nenhum OKR" description="Defina objetivos por instituição ou sincronize os do Notion em Integrações." action={<Button onClick={() => setCreating(true)}><Plus size={16} />Objetivo</Button>} />;
   return (
     <div>
-      <PageHeader title="OKRs" subtitle="Objetivos e resultados-chave por instituição e ciclo; os do Notion são pessoais"
-        actions={<><SelectField label="Ciclo" className="w-40" value={cycle} onChange={(e) => setCycle(e.target.value)} options={cycles.map((c) => ({ value: c, label: c }))} placeholder="Todos" />
-          <Button className="self-end" onClick={() => setCreating(true)}><Plus size={16} />Objetivo</Button></>} />
-      {objectives.error ? <ErrorState message={objectives.error} onRetry={objectives.reload} /> : objectives.loading ? <Loading /> : list.length === 0 ? <EmptyState icon={<Target />} title="Nenhum OKR" description="Defina objetivos por instituição. O progresso só é calculado quando a meta é válida." action={<Button onClick={() => setCreating(true)}><Plus size={16} />Objetivo</Button>} /> : (
+      <PageHeader title="OKRs" eyebrow="Estratégia" subtitle={`${list.length} objetivo(s) · ${list.reduce((n, o) => n + o.key_results.length, 0)} KR(s) · os do Notion são pessoais`}
+        actions={<><Segmented label="Visualização" value={view} onChange={setView} options={[{ value: 'objetivos', label: 'Kanban por Objetivo' }, { value: 'kanban', label: 'Por status' }, { value: 'lista', label: 'Lista' }]} />
+          <Button onClick={() => setCreating(true)}><Plus size={16} />Objetivo</Button></>} />
+      <PushBanner entity="krs" />
+      <FilterBar>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SelectField label="Ciclo" value={cycle} onChange={(e) => setCycle(e.target.value)} options={cycles.map((c) => ({ value: c, label: c || 'Sem ciclo' }))} placeholder="Todos" />
+          {view !== 'lista' && <SelectField className="lg:col-span-2" label="Objetivo (tópico)" value={objFilter} onChange={(e) => setObjFilter(e.target.value)} options={list.map((o) => ({ value: o.id, label: o.title }))} placeholder="Todos os objetivos" />}
+        </div>
+        {view === 'objetivos' && <Checkbox className="self-start text-xs text-muted" label="Mostrar KRs encerrados (no Notion este quadro mostra só os ativos)" checked={showClosed} onChange={setShowClosed} />}
+      </FilterBar>
+      {objectives.error ? <ErrorState message={objectives.error} onRetry={objectives.reload} /> : objectives.loading ? <Loading /> : list.length === 0 ? empty :
+        view === 'kanban' ? (
+          <KanbanBoard columns={KR_COLUMNS} items={cards} columnOf={(c) => krColumnOf(c.k.status)} onMove={move} itemLabel={(c) => c.k.title} emptyText="Arraste KRs para cá"
+            renderCard={(c) => <KrCardView c={c} showObjective onEdit={() => setKrEdit({ card: c, statusOnly: null })} />} />
+        ) : view === 'objetivos' ? (
+          objColumns.length === 0 ? <EmptyState icon={<Target />} title="Nenhum KR ativo" description="Marque “Mostrar KRs encerrados” para ver os concluídos e os não atingidos." /> :
+          <KanbanBoard readOnly columns={objColumns}
+            items={objCards} columnOf={(c) => c.o.id} onMove={() => {}} itemLabel={(c) => c.k.title} emptyText="Nenhum KR neste objetivo"
+            renderCard={(c) => <KrCardView c={c} onEdit={() => setKrEdit({ card: c, statusOnly: null })} onStatus={(s) => setStatus(c, s)} />} />
+        ) : (
         <ul className="grid gap-3 lg:grid-cols-2">
           {list.map((o) => {
             const p = objectiveProgress(o.key_results);
@@ -132,6 +268,7 @@ export default function Okrs() {
         </ul>
       )}
       <ObjectiveDialog open={creating || !!editing} item={editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); } }} />
+      <KrDialog card={krEdit?.card ?? null} statusOnly={krEdit?.statusOnly ?? null} onOpenChange={(o) => { if (!o) setKrEdit(null); }} />
       {confirmNode}
     </div>
   );

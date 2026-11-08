@@ -43,6 +43,8 @@ export interface Task extends BaseEntity {
   mission_date: string | null;
   completed_at: string | null;
   history: HistoryEntry[];
+  /** ATRIBUIÇÃO do Notion (70% / 20% / 10% / OFF WORK). Também pode ser definida na Central. */
+  attribution?: string[];
 }
 
 export type BlockStatus = 'planejado' | 'em_andamento' | 'concluido' | 'adiado';

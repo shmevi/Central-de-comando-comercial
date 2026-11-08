@@ -37,3 +37,16 @@ do $$ begin
   if (select person_id from notion_access where user_id = '77777777-7777-7777-7777-777777777777') <> '2e1d872b594c81d9a9b20002a5e7c1aa' then raise exception 'FALHA: vínculo de A mudou'; end if;
 end $$;
 select 'NOTION ACCESS OK' as resultado;
+
+-- 0006: atribuição das tarefas é uma lista (vazia por padrão)
+set role authenticated;
+set request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+insert into tasks (title) values ('Sem atribuição');
+insert into tasks (title, attribution) values ('Com atribuição', '["70%", "10%"]');
+do $$ begin
+  if (select attribution from tasks where title = 'Sem atribuição') <> '[]'::jsonb then raise exception 'FALHA: atribuição padrão deveria ser []'; end if;
+  begin insert into tasks (title, attribution) values ('Inválida', '"70%"'); raise exception 'FALHA: atribuição que não é lista aceita';
+  exception when check_violation then null; end;
+end $$;
+reset role;
+select 'ATRIBUICAO OK' as resultado;

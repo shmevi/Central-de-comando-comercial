@@ -19,6 +19,7 @@ export default {
         warning: v('warning'),
         danger: v('danger'),
         info: v('info'),
+        purple: v('purple'),
       },
       fontFamily: {
         // Fonte de identidade (Capture It) só em marca e títulos principais; cai para Barlow Condensed se ausente.

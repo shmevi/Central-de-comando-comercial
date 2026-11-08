@@ -1,11 +1,14 @@
 /**
  * Lógica HTTP da Edge Function notion-sync — SÓ PARA O SERVIDOR (nenhuma tela importa este arquivo).
  *
- * Dois modos, os dois SOMENTE LEITURA do Notion (não existe aqui nenhum caminho de escrita no Notion):
+ * Modos:
  * - "dry_run" (padrão): lê, filtra o responsável, converte e calcula o plano. Devolve só contagens e IDs.
  * - "read": devolve as páginas do responsável (já filtradas e minimizadas, ver clientRead) para o navegador
- *   planejar e gravar NA CENTRAL com a sessão do próprio usuário (RLS). O servidor não grava em lugar nenhum.
- * Pedido com dry_run=false (escrita) é recusado (403).
+ *   planejar e gravar NA CENTRAL com a sessão do próprio usuário (RLS).
+ * - "push": ÚNICO caminho de escrita no Notion. Só com a escrita autorizada nas Configurações
+ *   (settings.notion_write_enabled, lido do banco com o JWT de quem chamou) e só para páginas do responsável;
+ *   cada alteração é validada e conferida contra o Notion em pushCore.ts. Só propriedades; nunca cria/apaga páginas.
+ * Pedido com o antigo dry_run=false é recusado (403).
  *
  * Quem pode ler: só a conta com vínculo em public.notion_access (criado pelo administrador). O person_id usado
  * é SEMPRE o do vínculo, nunca o digitado nas Configurações — assim ninguém lê as tarefas de outra pessoa com o
@@ -17,16 +20,17 @@
  * - a resposta traz contagens e IDs de página do responsável — nenhum título ou conteúdo de página.
  */
 import type { NotionSyncState, Objective, ReviewQueueItem, Settings, Task } from '@/domain/types';
-import type { NotionAdapter } from './adapter';
+import type { NotionWriteAdapter } from './adapter';
 import { createNotionApiAdapter } from './apiAdapter';
 import { checkNotionConfig, describeConfigProblem, resolveNotionConfig } from './config';
 import { clientRead, dryRunReport, readAndPlan, readNotion } from './pipeline';
+import { applyPush, parseChanges } from './pushCore';
 
 export interface HandlerDeps {
   env: (key: string) => string | undefined;
   fetch?: typeof fetch;
   /** Testes injetam um adaptador falso; em produção é a API do Notion. */
-  makeAdapter?: (token: string, ds: { tarefas: string; krs: string; objetivos: string }) => NotionAdapter;
+  makeAdapter?: (token: string, ds: { tarefas: string; krs: string; objetivos: string }) => NotionWriteAdapter;
   now?: () => string;
 }
 
@@ -59,11 +63,13 @@ export async function handleNotionSync(req: Request, deps: HandlerDeps): Promise
   const auth = req.headers.get('Authorization') ?? '';
   if (!/^Bearer\s+\S+/.test(auth)) return json(401, { error: 'Sessão ausente.' });
 
-  let body: { dry_run?: unknown; mode?: unknown } = {};
+  let body: { dry_run?: unknown; mode?: unknown; changes?: unknown } = {};
   try { body = (await req.json()) ?? {}; } catch { /* corpo vazio = padrão */ }
-  if (body.dry_run === false) return json(403, { error: 'Escrita desativada nesta versão: apenas leitura.' });
+  if (body.dry_run === false) return json(403, { error: 'Use o modo "push" para enviar alterações ao Notion.' });
   const mode = body.mode ?? 'dry_run';
-  if (mode !== 'dry_run' && mode !== 'read') return json(400, { error: 'Modo inválido. Use "dry_run" ou "read".' });
+  if (mode !== 'dry_run' && mode !== 'read' && mode !== 'push') return json(400, { error: 'Modo inválido. Use "dry_run", "read" ou "push".' });
+  const changes = mode === 'push' ? parseChanges(body.changes) : [];
+  if (typeof changes === 'string') return json(400, { error: changes });
 
   const token = deps.env('NOTION_TOKEN');
   if (!token) return json(503, { error: 'NOTION_TOKEN não configurado no servidor (Edge Secret). Nada foi lido.' });
@@ -94,6 +100,14 @@ export async function handleNotionSync(req: Request, deps: HandlerDeps): Promise
     const ds = { tarefas: config.tasks_data_source_id, krs: config.krs_data_source_id, objetivos: config.objectives_data_source_id };
     const adapter = deps.makeAdapter ? deps.makeAdapter(token, ds) : createNotionApiAdapter({ token, dataSources: ds, fetch: f });
     const now = deps.now ? deps.now() : new Date().toISOString();
+    if (mode === 'push') {
+      // Fail-closed: sem a autorização explícita salva nas Configurações, nada é escrito.
+      const st = settingsRows[0] as (Settings & { notion_write_enabled?: boolean }) | undefined;
+      if (st?.notion_enabled !== true || st?.notion_write_enabled !== true)
+        return json(403, { error: 'Escrita no Notion não autorizada. Ative "Autorizar escrita no Notion" em Integrações. Nada foi alterado.' });
+      const results = await applyPush(adapter, config, changes);
+      return json(200, { mode: 'push', gerado_em: now, results });
+    }
     if (mode === 'read') {
       const read = await readNotion(adapter, config, states);
       return json(200, { mode: 'read', gerado_em: now, person_id: config.person_id, read: clientRead(read, config) });

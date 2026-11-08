@@ -110,9 +110,9 @@ describe('Notion: mapeamento de tarefas', () => {
   const pg = (id: string) => data.tarefas.find((p) => p.id === id)!;
   it('status e prioridade aprovados', () => {
     const r = mapTask(pg(I.t_responsavel));
-    expect(r.ok && r.fields).toEqual({ title: '[Demonstração] Revisar funil de matrículas', status: 'a_fazer', priority: 'urgente', due_date: '2026-11-10' });
+    expect(r.ok && r.fields).toEqual({ title: '[Demonstração] Revisar funil de matrículas', status: 'a_fazer', priority: 'urgente', due_date: '2026-11-10', attribution: ['70%'] });
     const p = mapTask(pg(I.t_pausada));
-    expect(p.ok && [p.fields.status, p.fields.priority]).toEqual(['aguardando', 'baixa']);
+    expect(p.ok && [p.fields.status, p.fields.priority, p.fields.attribution]).toEqual(['aguardando', 'baixa', ['70%', '10%']]);
     const e = mapTask(pg(I.t_responsavel_e_outra));
     expect(e.ok && [e.fields.status, e.fields.priority]).toEqual(['em_andamento', 'alta']);
   });

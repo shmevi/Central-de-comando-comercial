@@ -5,6 +5,7 @@ import { NotionBadge } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
 import { useDraft } from '@/components/ui/use-draft';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
+import { TASK_ATTRIBUTION_OPTIONS, sortAttribution } from '@/integrations/notion/config';
 import { InstitutionSelect } from '@/components/domain/Institution';
 import { isFromNotion } from '@/integrations/notion/mapping';
 import { PRIORITY, RECURRENCE, TASK_STATUS, toOptions } from '@/domain/labels';
@@ -69,6 +70,15 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
             <SelectField label="Prioridade" value={d.priority} onChange={(e) => set('priority', e.target.value as any)} options={Object.entries(PRIORITY).map(([v, p]) => ({ value: v, label: p.label }))} />
             <InstitutionSelect value={d.institution_id} onChange={(v) => set('institution_id', v)} />
             <SelectField label="Categoria" value={d.category} onChange={(e) => set('category', e.target.value)} options={[...new Set([...settings.categories, d.category])].map((c) => ({ value: c, label: c }))} />
+            <fieldset className="sm:col-span-2">
+              <legend className="label mb-1.5">Atribuição (como no Notion)</legend>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {TASK_ATTRIBUTION_OPTIONS.map((a) => {
+                  const cur = sortAttribution(d.attribution);
+                  return <Checkbox key={a} label={a} checked={cur.includes(a)} onChange={(v) => set('attribution', sortAttribution(v ? [...cur, a] : cur.filter((x) => x !== a)))} />;
+                })}
+              </div>
+            </fieldset>
           </div>
         </FormSection>
         <FormSection title="Prazo e repetição">

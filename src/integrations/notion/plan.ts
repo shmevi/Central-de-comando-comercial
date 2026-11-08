@@ -14,7 +14,7 @@
  */
 import type { KeyResult, NotionConfig, NotionSyncEntity, NotionSyncState, Objective, ReviewKind, ReviewQueueItem, SyncStatus, Task } from '@/domain/types';
 import type { NotionPage } from './adapter';
-import { PROPS, notionRef, normalizePageId } from './config';
+import { PROPS, notionRef, normalizePageId, sortAttribution } from './config';
 import { stateHash } from './hash';
 import { cycleFromPeriods, isOwnedBy, krSyncFields, mapKr, mapTask, taskSyncFields, textOf, type TaskSyncFields } from './mapping';
 
@@ -151,8 +151,16 @@ export async function planNotionSync(input: PlanInput): Promise<SyncPlan> {
       continue;
     }
 
-    const cf = taskSyncFields(localTask); const cHash = await stateHash(cf);
-    const outcome = threeWay(st?.synced_hash ?? null, nHash, cHash);
+    // Base gravada antes de a Central ler a ATRIBUIÇÃO: a Central nunca teve esse campo, então ele é adotado do
+    // Notion sem contar como mudança (evita conflito falso em todas as tarefas já sincronizadas).
+    const legacy = !!st?.synced_snapshot && !('attribution' in (st.synced_snapshot as object));
+    const cf = taskSyncFields(localTask);
+    if (legacy) cf.attribution = nf.attribution;
+    const cHash = await stateHash(cf);
+    const baseHash = legacy ? await stateHash({ ...(st!.synced_snapshot as object), attribution: nf.attribution }) : (st?.synced_hash ?? null);
+    const outcome = threeWay(baseHash, nHash, cHash);
+    if (legacy && JSON.stringify(sortAttribution(localTask.attribution)) !== JSON.stringify(nf.attribution) && outcome !== 'notion')
+      plan.taskUpdates.push({ id: localTask.id, patch: { attribution: nf.attribution } });
     if (outcome === 'igual') {
       plan.counts.tarefas.sem_mudanca++;
       if (!st || st.synced_hash !== nHash || st.sync_status !== 'ok' || st.local_id !== localTask.id)
@@ -161,6 +169,7 @@ export async function planNotionSync(input: PlanInput): Promise<SyncPlan> {
       const br = breakerAllows('tarefas', pid, st); if (!br) continue;
       const changed = diffKeys(nf, cf);
       const patch: Partial<Task> = Object.fromEntries(changed.map((k) => [k, nf[k as keyof TaskSyncFields]]));
+      if (legacy) patch.attribution = nf.attribution;
       if (changed.includes('status')) patch.completed_at = nf.status === 'concluida' ? (localTask.completed_at ?? now) : null;
       patch.history = [...localTask.history, { at: now, action: 'Atualizada pelo Notion', detail: changed.join(', ') }];
       plan.taskUpdates.push({ id: localTask.id, patch });

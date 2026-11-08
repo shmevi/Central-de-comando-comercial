@@ -1,12 +1,13 @@
 /**
- * Adaptador da API oficial do Notion — SOMENTE LEITURA e SÓ PARA O SERVIDOR (Edge Function notion-sync).
+ * Adaptador da API oficial do Notion — SÓ PARA O SERVIDOR (Edge Function notion-sync).
  * Nenhuma tela importa este arquivo, então ele não entra no JavaScript do navegador. O token é recebido por
  * parâmetro (vem de um Edge Secret) e nunca aparece em mensagem de erro ou log.
  *
- * Endpoints usados (todos de leitura): GET /data_sources/{id}, POST /data_sources/{id}/query,
- * GET /pages/{id}, GET /pages/{id}/properties/{prop}. Nenhum POST/PATCH/DELETE de conteúdo.
+ * Leitura: GET /data_sources/{id}, POST /data_sources/{id}/query, GET /pages/{id}, GET /pages/{id}/properties/{prop}.
+ * Escrita (só via `update`, chamado pelo envio Central → Notion já validado em pushCore.ts): PATCH /pages/{id} com
+ * `properties`. Nunca cria, arquiva ou apaga páginas; nunca mexe em conteúdo (blocos).
  */
-import type { NotionAdapter, NotionPage, NotionPropertyValue, NotionQuery, NotionSource, NotionStatusGroup } from './adapter';
+import type { NotionPage, NotionPropertyValue, NotionQuery, NotionSource, NotionStatusGroup, NotionWriteAdapter, NotionWriteValue } from './adapter';
 import { PROPS, normalizePageId, normalizeUserId } from './config';
 
 export const NOTION_API = 'https://api.notion.com/v1';
@@ -50,14 +51,14 @@ export function normalizeProgress(raw: unknown, meta: number | null, atual: numb
 
 const plain = (arr: Json[] | undefined) => (arr ?? []).map((t) => t?.plain_text ?? '').join('').trim() || null;
 
-export function createNotionApiAdapter(opts: ApiAdapterOptions): NotionAdapter {
+export function createNotionApiAdapter(opts: ApiAdapterOptions): NotionWriteAdapter {
   if (!opts.token) throw new Error('Token do Notion ausente.');
   const doFetch = opts.fetch ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const maxRetries = opts.maxRetries ?? 4;
   const groupMaps = new Map<string, Map<string, NotionStatusGroup | null>>(); // data source → (status option id/nome → grupo)
 
-  async function call(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Json> {
+  async function call(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<Json> {
     for (let attempt = 0; ; attempt++) {
       const res = await doFetch(`${NOTION_API}${path}`, {
         method,
@@ -176,9 +177,31 @@ export function createNotionApiAdapter(opts: ApiAdapterOptions): NotionAdapter {
     return { and };
   }
 
+  /** Valor normalizado → formato da API. Só os tipos que a integração escreve. */
+  const toApi = (v: NotionWriteValue): Json => {
+    switch (v.type) {
+      case 'title': return { title: [{ type: 'text', text: { content: v.text } }] };
+      case 'status': return { status: { name: v.name } };
+      case 'select': return { select: { name: v.name } };
+      case 'multi_select': return { multi_select: v.names.map((name) => ({ name })) };
+      case 'date': return { date: v.start ? { start: v.start, end: v.end ?? null } : null };
+      case 'number': return { number: v.value };
+    }
+  };
+  const dsOf = (source: 'tarefas' | 'krs') => (source === 'tarefas' ? opts.dataSources.tarefas : opts.dataSources.krs);
+  const statusPropOf = (source: 'tarefas' | 'krs') => (source === 'tarefas' ? PROPS.tarefas.status : PROPS.krs.status);
+
   return {
     kind: 'api',
     isDemo: false,
+    async statusOptions(source) {
+      const m = await groupMap(dsOf(source), statusPropOf(source));
+      return [...m.keys()].filter((k) => k.startsWith('name:')).map((k) => k.slice(5));
+    },
+    async update(source, pageId, properties) {
+      const body = { properties: Object.fromEntries(Object.entries(properties).map(([k, v]) => [k, toApi(v)])) };
+      return toPage(await call('PATCH', `/pages/${toUuid(pageId)}`, body), source);
+    },
     async query(source, q) {
       if (!q.personId || !q.dataSourceId) throw new Error('Consulta sem responsável ou sem data source — recusada.');
       const body: Json = { filter: await buildFilter(q), page_size: Math.min(q.pageSize ?? 100, 100) };

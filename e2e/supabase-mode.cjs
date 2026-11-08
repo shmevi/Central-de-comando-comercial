@@ -18,6 +18,7 @@ const session = (email) => ({ access_token: tokenFor(email), token_type: 'bearer
 const db = {}; const calls = []; const storage = new Map(); const fnCalls = [];
 const NP = { person: 'e2e00000000000000000000000000001', tasks: 'e2e0db00000000000000000000000001', krs: 'e2e0db00000000000000000000000002', objs: 'e2e0db00000000000000000000000003' };
 const EDIT = '2026-11-07T12:00:00.000Z';
+const krStatus = {};
 function notionRead() {
   const people = { type: 'people', ids: [NP.person] };
   const task = (id, title, status, group, prio, due) => ({ id, last_edited_time: EDIT, parent_data_source_id: NP.tasks, archived: false, properties: {
@@ -31,7 +32,7 @@ function notionRead() {
     ],
     krs: [{ id: 'e2e00000000000000000000000000201', last_edited_time: EDIT, parent_data_source_id: NP.krs, archived: false, properties: {
       'Resultado Chave (KR)': { type: 'title', text: 'KR real do Notion (e2e)' }, Dono: people, 'Objetivo (O)': { type: 'relation', ids: ['e2e00000000000000000000000000301'] },
-      Status: { type: 'status', name: 'A caminho', group: 'to_do' }, Meta: { type: 'number', value: 10 }, Atual: { type: 'number', value: 4 },
+      Status: { type: 'status', name: krStatus['e2e00000000000000000000000000201'] || 'A caminho', group: 'to_do' }, Meta: { type: 'number', value: 10 }, Atual: { type: 'number', value: 4 },
       'Período': { type: 'date', start: '2026-10-01', end: '2026-12-31' }, Progresso: { type: 'formula', value: 40 } } }],
     objetivos: [{ id: 'e2e00000000000000000000000000301', last_edited_time: EDIT, parent_data_source_id: NP.objs, archived: false, properties: { 'Visão': { type: 'title', text: 'Objetivo real do Notion (e2e)' } } }],
     missing: [], counts: { tarefas: { consulta: 3, rastreadas: 0 }, krs: { consulta: 1, rastreadas: 0 }, objetivos: 1 },
@@ -70,6 +71,17 @@ async function handle(route) {
     const uidF = userFromAuth(req.headers()['authorization'] || '');
     fnCalls.push({ uid: uidF, body: JSON.parse(req.postData() || '{}') });
     if (uidF !== USERS['coord@cppem.com.br'].id) return json(403, { error: 'Esta conta ainda não está liberada para ler o Notion. Peça ao administrador para criar o vínculo (tabela notion_access). Nada foi lido.' });
+    const body = JSON.parse(req.postData() || '{}');
+    if (body.mode === 'push') {
+      const st = (db.settings || []).find((x) => x.user_id === uidF);
+      if (!st?.notion_write_enabled) return json(403, { error: 'Escrita no Notion não autorizada. Ative "Autorizar escrita no Notion" em Integrações. Nada foi alterado.' });
+      const results = body.changes.map((c) => {
+        if (c.entity === 'krs' && c.fields.status) krStatus[c.page_id] = c.fields.status;
+        const page = notionRead().read[c.entity].find((x) => x.id === c.page_id);
+        return { entity: c.entity, page_id: c.page_id, status: 'enviado', written: Object.keys(c.fields), page: { ...page, last_edited_time: '2026-11-08T12:00:00.000Z' } };
+      });
+      return json(200, { mode: 'push', results });
+    }
     return json(200, notionRead());
   }
   const m = /^\/rest\/v1\/([a-z_]+)$/.exec(url.pathname);
@@ -178,6 +190,22 @@ async function handle(route) {
   await p.click('button:has-text("Sincronizar (somente leitura)")');
   ok(await p.locator('text=Leitura concluída: 0 tarefa(s) e 0 KR(s)').waitFor({ timeout: 10000 }).then(() => true, () => false), 'segunda sincronização não duplica nada');
   ok((db.tasks || []).filter((t) => (t.external_ref || '').startsWith('notion:')).length === 2, 'continua com 2 tarefas do Notion no banco');
+  // Envio Central → Notion: muda o status do KR no Kanban por Objetivo, confirma e envia pelo servidor
+  await p.goto(BASE + '/okrs'); await p.waitForSelector('section[aria-label="Objetivo real do Notion (e2e)"]');
+  await p.getByRole('combobox', { name: 'Status de KR real do Notion (e2e)' }).selectOption('Concluído (Atingiu)');
+  await p.click('button:has-text("Revisar e enviar ao Notion")');
+  ok(await p.locator('role=dialog >> button:has-text("Enviar 1 ao Notion")').isDisabled(), 'Supabase: envio bloqueado sem a escrita autorizada');
+  await p.keyboard.press('Escape');
+  await p.goto(BASE + '/integracoes'); await p.click('text=Autorizar escrita no Notion'); await p.click('role=dialog >> button:has-text("Autorizo")');
+  await p.waitForTimeout(300);
+  await p.goto(BASE + '/okrs'); await p.click('button:has-text("Revisar e enviar ao Notion")');
+  await p.click('role=dialog >> button:has-text("Enviar 1 ao Notion")');
+  ok(await p.locator('text=Notion: 1 enviada(s)').waitFor({ timeout: 8000 }).then(() => true, () => false), 'Supabase: envio confirmado');
+  const push = fnCalls.find((c) => c.body.mode === 'push');
+  ok(!!push && push.uid === uidA && push.body.changes.length === 1 && JSON.stringify(push.body.changes[0]) === JSON.stringify({ entity: 'krs', page_id: 'e2e00000000000000000000000000201', fields: { status: 'Concluído (Atingiu)' }, base: { status: 'A caminho' } }),
+    'servidor recebe só o campo alterado, com a base (anti-sobrescrita)');
+  ok((db.notion_sync_state || []).find((x) => x.notion_page_id === 'e2e00000000000000000000000000201')?.synced_snapshot?.status === 'Concluído (Atingiu)', 'estado de sincronização atualizado com o que ficou no Notion');
+  ok((db.sync_logs || []).some((l) => l.direction === 'escrita' && l.status === 'sucesso' && l.user_id === uidA), 'log de escrita no banco do usuário');
   await p.goto(BASE + '/'); await p.waitForSelector('text=Missão do dia');
 
   // sessão persiste entre recargas; sair volta para o login

@@ -90,3 +90,24 @@ export async function queryAll(adapter: NotionAdapter, source: Exclude<NotionSou
   }
   throw new Error(`Consulta ao Notion (${source}) excedeu ${maxPages} páginas de resultado.`);
 }
+
+// =============================================================== ESCRITA (Central → Notion)
+/**
+ * Contrato de ESCRITA, separado do de leitura de propósito. Só é usado pelo envio (push.ts / pushCore.ts), que
+ * exige: escrita autorizada nas Configurações, confirmação explícita a cada envio e página do responsável.
+ * Só altera propriedades de páginas existentes — nunca cria, arquiva ou apaga páginas.
+ */
+export type NotionWriteValue =
+  | { type: 'title'; text: string }
+  | { type: 'status'; name: string }
+  | { type: 'select'; name: string }
+  | { type: 'multi_select'; names: string[] }
+  | { type: 'date'; start: string | null; end: string | null }
+  | { type: 'number'; value: number | null };
+
+export interface NotionWriteAdapter extends NotionAdapter {
+  /** Nomes de opção válidos para a propriedade de status da base (ex.: status dos KRs, que são texto livre). */
+  statusOptions(source: Exclude<NotionSource, 'objetivos'>): Promise<string[]>;
+  /** Atualiza propriedades de UMA página e devolve a página já normalizada (com o novo last_edited_time). */
+  update(source: Exclude<NotionSource, 'objetivos'>, pageId: string, properties: Record<string, NotionWriteValue>): Promise<NotionPage>;
+}

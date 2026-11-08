@@ -24,6 +24,7 @@
   --warning: 233 170 60;
   --danger: 240 110 100;
   --info: 120 170 240;
+  --purple: 186 146 240;  /* opção roxa do Notion (OFF WORK) */
   --on-gold: 20 16 8;
   --focus: 243 216 142;
   --chart-1: 176 138 61;   /* validado: banda L e contraste ≥3:1 sobre #141416 */
@@ -51,6 +52,7 @@
   --warning: 150 95 0;
   --danger: 185 40 35;
   --info: 30 90 180;
+  --purple: 112 64 176;
   --on-gold: 20 16 8;
   --focus: 140 107 46;
   --chart-1: 170 132 56;   /* validado sobre #FFFFFF */

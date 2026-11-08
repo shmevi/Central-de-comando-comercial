@@ -5,7 +5,7 @@
 import type { KeyResult, Priority, Task, TaskStatus } from '@/domain/types';
 import { isValidISODate } from '@/lib/time';
 import type { NotionPage, NotionPropertyValue } from './adapter';
-import { NOTION_REF_PREFIX, PROPS, TASK_PRIORITY_MAP, TASK_STATUS_MAP, normalizePageId, normalizeUserId } from './config';
+import { NOTION_REF_PREFIX, PROPS, TASK_PRIORITY_MAP, TASK_STATUS_MAP, normalizePageId, normalizeUserId, sortAttribution } from './config';
 
 // ---------------------------------------------------------------- leitura tipada de propriedades
 const prop = (p: NotionPage, name: string): NotionPropertyValue | undefined => p.properties[name];
@@ -50,7 +50,11 @@ export function isOwnedBy(page: NotionPage, personProperty: string, personId: st
 }
 
 // ---------------------------------------------------------------- Tarefas
-export type TaskSyncFields = Pick<Task, 'title' | 'status' | 'priority' | 'due_date'>;
+export type TaskSyncFields = Pick<Task, 'title' | 'status' | 'priority' | 'due_date'> & { attribution: string[] };
+/** Nomes de um multi-select (ex.: ATRIBUIÇÃO). */
+export function namesOf(v: NotionPropertyValue | undefined): string[] {
+  return v && v.type === 'multi_select' ? v.names : [];
+}
 export interface MapProblem { field: string; value: string | null; message: string }
 export type MapResult<T> = { ok: true; fields: T } | { ok: false; problems: MapProblem[]; partial: Partial<T> };
 
@@ -67,12 +71,13 @@ export function mapTask(page: NotionPage): MapResult<TaskSyncFields> {
   if (!priority) problems.push({ field: 'priority', value: rawPrio, message: rawPrio ? `Prioridade desconhecida: "${rawPrio}"` : 'Prioridade vazia' });
   // Prazo com intervalo: a Central tem uma data só; usa o início (a mesma coluna date:PRAZO:start da descoberta).
   const due_date = dateOf(prop(page, P.due_date)).start;
-  const partial: Partial<TaskSyncFields> = { ...(title ? { title } : {}), ...(status ? { status } : {}), ...(priority ? { priority } : {}), due_date };
+  const attribution = sortAttribution(namesOf(prop(page, P.attribution)));
+  const partial: Partial<TaskSyncFields> = { ...(title ? { title } : {}), ...(status ? { status } : {}), ...(priority ? { priority } : {}), due_date, attribution };
   if (problems.length) return { ok: false, problems, partial };
-  return { ok: true, fields: { title: title!, status: status!, priority: priority!, due_date } };
+  return { ok: true, fields: { title: title!, status: status!, priority: priority!, due_date, attribution } };
 }
-export const taskSyncFields = (t: Pick<Task, 'title' | 'status' | 'priority' | 'due_date'>): TaskSyncFields =>
-  ({ title: t.title, status: t.status, priority: t.priority, due_date: t.due_date ?? null });
+export const taskSyncFields = (t: Pick<Task, 'title' | 'status' | 'priority' | 'due_date' | 'attribution'>): TaskSyncFields =>
+  ({ title: t.title, status: t.status, priority: t.priority, due_date: t.due_date ?? null, attribution: sortAttribution(t.attribution) });
 
 // ---------------------------------------------------------------- KRs
 export type KrSyncFields = Required<Pick<KeyResult, 'title' | 'target' | 'current' | 'status' | 'period_start' | 'period_end'>>;

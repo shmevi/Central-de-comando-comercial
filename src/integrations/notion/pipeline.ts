@@ -116,20 +116,23 @@ export function dryRunReport(read: NotionRead, plan: SyncPlan, config: NotionCon
  *   planejador (barreira 2) só marca o estado delas — sem título nem conteúdo, que nunca saem do servidor.
  * - Objetivos (só os ligados a KRs do responsável): só o título.
  */
+/** Página minimizada: só as propriedades usadas pela integração; no responsável fica só a pessoa configurada. */
+export function minimizePage(p: NotionPage, entity: 'tarefas' | 'krs' | 'objetivos', personId: string): NotionPage {
+  const keys = Object.values(PROPS[entity]) as string[];
+  const properties: NotionPage['properties'] = {};
+  for (const k of keys) if (p.properties[k] !== undefined) properties[k] = p.properties[k];
+  if (entity !== 'objetivos') properties[PROPS[entity].responsible] = { type: 'people', ids: [normalizePageId(personId)] };
+  return { id: normalizePageId(p.id), url: p.url ?? null, last_edited_time: p.last_edited_time, parent_data_source_id: p.parent_data_source_id ?? null, archived: !!p.archived, properties };
+}
+
 export function clientRead(read: NotionRead, config: NotionConfig): NotionRead {
-  const pick = (p: NotionPage, keys: readonly string[], personProp?: string): NotionPage => {
-    const properties: NotionPage['properties'] = {};
-    for (const k of keys) if (p.properties[k] !== undefined) properties[k] = p.properties[k];
-    if (personProp) properties[personProp] = { type: 'people', ids: [normalizePageId(config.person_id)] };
-    return { id: normalizePageId(p.id), url: p.url ?? null, last_edited_time: p.last_edited_time, parent_data_source_id: p.parent_data_source_id ?? null, archived: !!p.archived, properties };
-  };
   const skeleton = (p: NotionPage): NotionPage => ({ id: normalizePageId(p.id), last_edited_time: p.last_edited_time, parent_data_source_id: p.parent_data_source_id ?? null, archived: !!p.archived, properties: {} });
-  const side = (pages: NotionPage[], props: Record<string, string>, personProp: string, ds: string) => pages.map((p) =>
-    !p.archived && fromDataSource(p, ds) && isOwnedBy(p, personProp, config.person_id) ? pick(p, Object.values(props), personProp) : skeleton(p));
+  const side = (pages: NotionPage[], entity: 'tarefas' | 'krs', ds: string) => pages.map((p) =>
+    !p.archived && fromDataSource(p, ds) && isOwnedBy(p, PROPS[entity].responsible, config.person_id) ? minimizePage(p, entity, config.person_id) : skeleton(p));
   return {
-    tarefas: side(read.tarefas, PROPS.tarefas, PROPS.tarefas.responsible, config.tasks_data_source_id),
-    krs: side(read.krs, PROPS.krs, PROPS.krs.responsible, config.krs_data_source_id),
-    objetivos: read.objetivos.map((p) => (fromDataSource(p, config.objectives_data_source_id) ? pick(p, Object.values(PROPS.objetivos)) : skeleton(p))),
+    tarefas: side(read.tarefas, 'tarefas', config.tasks_data_source_id),
+    krs: side(read.krs, 'krs', config.krs_data_source_id),
+    objetivos: read.objetivos.map((p) => (fromDataSource(p, config.objectives_data_source_id) ? minimizePage(p, 'objetivos', config.person_id) : skeleton(p))),
     missing: read.missing.map(normalizePageId),
     counts: read.counts,
   };

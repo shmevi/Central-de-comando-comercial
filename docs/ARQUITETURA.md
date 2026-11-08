@@ -131,11 +131,16 @@ vínculo — o ID digitado nas Configurações não permite ler outra pessoa. Mo
 `dry_run` (padrão; contagens e IDs) e `read` (páginas do responsável, minimizadas por `clientRead`: só as propriedades
 usadas, sem corresponsáveis; páginas de outra pessoa viram esqueleto sem dados). No modo Supabase, o botão
 "Sincronizar" da tela Integrações chama o modo `read` (`remoteReader.ts`) e o navegador planeja e grava **na Central**
-com a sessão do usuário (`sync.ts`). No modo local continua o adaptador de demonstração. `dry_run: false` é recusado. Deploy:
+com a sessão do usuário (`sync.ts`). No modo local continua o adaptador de demonstração. Modo `push` (único caminho
+de escrita): exige `settings.notion_enabled` e `notion_write_enabled` (lidos com o JWT de quem chamou), valida em
+`pushCore.ts` (campos permitidos, página da base e do responsável, opções existentes, anti-sobrescrita contra a base) e faz
+`PATCH /pages/{id}` só com as propriedades alteradas. O navegador monta as pendências (`push.ts`) e só envia depois da
+confirmação na tela (`features/notion/PushPanel.tsx`). `dry_run: false` é recusado. Deploy:
 `npm run build:edge` gera `supabase/functions/notion-sync/dist/index.js` (bundle único, sem dependências) para enviar
 ao Supabase.
 
 Banco: migration `0002_notion_sync.sql` (`notion_sync_state`, unicidade de `external_ref`, `review_queue.kind`,
 `sync_logs.external_id/fields_changed`, `settings.notion_config`). O token do Notion **nunca** fica no banco nem no
 frontend. Migration `0005_notion_access.sql`: tabela de vínculo (o usuário só lê a própria linha; não cria nem altera).
-A escrita (Central → Notion) é fase posterior e exigirá ativação e confirmação explícitas.
+Migration `0006_tarefas_atribuicao.sql`: `tasks.attribution` (ATRIBUIÇÃO do Notion). Tarefas sincronizadas antes dela
+adotam a atribuição do Notion sem conflito (base antiga sem o campo).

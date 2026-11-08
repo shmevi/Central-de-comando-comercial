@@ -7,24 +7,17 @@ import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/dialog';
 import { Checkbox, SelectField, TextField } from '@/components/ui/form';
 import { useToast } from '@/components/ui/toast';
-import { MOCK_NOTION_CONFIG, mockNotionAdapter } from '@/integrations/notion/mockAdapter';
-import { chooseObjective, discardReview, readerFromAdapter, resolveConflict, syncNotion, type NotionReader } from '@/integrations/notion/sync';
-import { createRemoteNotionReader } from '@/integrations/notion/remoteReader';
-import { DATA_MODE, supabase } from '@/data/supabaseClient';
+import { MOCK_NOTION_CONFIG } from '@/integrations/notion/mockAdapter';
+import { chooseObjective, discardReview, resolveConflict, syncNotion } from '@/integrations/notion/sync';
+import { notionReader } from '@/features/notion/connection';
+import { PushBanner } from '@/features/notion/PushPanel';
 import { ACTIVE_STATUS_GROUPS, PROPS, REQUIRED_NOTION_FIELDS, TASK_PRIORITY_MAP, TASK_STATUS_MAP, checkNotionConfig, describeConfigProblem, isNotionId, normalizePageId, resolveNotionConfig } from '@/integrations/notion/config';
 import type { NotionConfig, ReviewKind, ReviewQueueItem } from '@/domain/types';
 import { PRIORITY, TASK_STATUS } from '@/domain/labels';
 import { fmtDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
-/**
- * Leitura em uso:
- * - modo Supabase: Notion REAL, lido no servidor (Edge Function notion-sync; o token fica só lá);
- * - modo local (dados só no navegador): adaptador de DEMONSTRAÇÃO, com dados fictícios.
- */
-const adapter: NotionReader = DATA_MODE === 'supabase'
-  ? createRemoteNotionReader((name, opts) => supabase().functions.invoke(name, opts))
-  : readerFromAdapter(mockNotionAdapter);
+const adapter = notionReader;
 
 const ENT_LABEL: Record<string, string> = { tarefas: 'Tarefas', krs: 'KRs', objetivos: 'Objetivos', okrs: 'OKRs (antigo)', reunioes: 'Reuniões (antigo)', geral: 'Geral' };
 const KIND_LABEL: Record<ReviewKind, string> = {
@@ -130,12 +123,12 @@ export default function Integracoes() {
   async function toggleEnabled(v: boolean) {
     const message = adapter.isDemo
       ? 'Neste modo o app usa um adaptador de DEMONSTRAÇÃO (dados fictícios). Nada será lido de um workspace real e nada será escrito. Ativar?'
-      : `A Central vai LER do Notion as tarefas e os KRs ativos de ${who} e trazê-los para cá. Nada será escrito no Notion. Ativar?`;
+      : `A Central vai LER do Notion as tarefas e os KRs ativos de ${who} e trazê-los para cá. A leitura não altera o Notion. Ativar?`;
     if (v && !(await confirm({ title: 'Ativar leitura do Notion', message, confirmLabel: 'Ativar leitura' }))) return;
     await save({ notion_enabled: v, ...(v ? {} : { notion_write_enabled: false }) });
   }
   async function toggleWrite(v: boolean) {
-    if (v && !(await confirm({ title: 'Permitir escrita no Notion', message: 'A escrita altera dados externos. Nesta versão nenhuma operação de escrita está implementada; esta chave apenas registra sua autorização para a fase futura, e cada escrita ainda exigirá confirmação individual. Confirmar?', confirmLabel: 'Autorizo', danger: true }))) return;
+    if (v && !(await confirm({ title: 'Permitir escrita no Notion', message: `Com esta opção ligada, você poderá ENVIAR ao Notion as mudanças feitas na Central (título, status, prioridade e prazo das tarefas; título, status, meta e atual dos KRs) de ${who}. Cada envio mostra antes o que vai mudar e só acontece quando você confirmar. Nada é criado ou apagado no Notion. Autorizar?`, confirmLabel: 'Autorizo', danger: true }))) return;
     await save({ notion_write_enabled: v });
   }
   async function runSync() {
@@ -150,7 +143,7 @@ export default function Integracoes() {
 
   return (
     <div>
-      <PageHeader title="Integrações" subtitle={`Notion — somente leitura · Tarefas e OKRs de ${who}`}
+      <PageHeader title="Integrações" subtitle={`Notion — leitura${settings.notion_write_enabled ? ' e envio com confirmação' : ' (envio desativado)'} · Tarefas e OKRs de ${who}`}
         actions={<Segmented label="Seção" value={tab} onChange={setTab} options={[
           { value: 'conexao', label: 'Conexão' }, { value: 'mapeamento', label: 'Campos' },
           { value: 'revisao', label: `Revisão${others.length ? ` (${others.length})` : ''}` },
@@ -163,6 +156,7 @@ export default function Integracoes() {
         </div>
       )}
 
+      <PushBanner />
       {tab === 'conexao' && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="space-y-4 p-4">
@@ -170,8 +164,8 @@ export default function Integracoes() {
               <span className={cn('chip ml-auto', settings.notion_enabled ? 'border-success/60 text-success' : 'border-border text-muted')}>{settings.notion_enabled ? <><CheckCircle2 size={12} />Leitura ativa</> : <><XCircle size={12} />Desativado</>}</span></div>
             <Checkbox label="Ativar leitura (tarefas e OKRs)" checked={settings.notion_enabled} onChange={toggleEnabled} />
             <div className="rounded-lg border border-border p-3">
-              <Checkbox label={<span className="flex items-center gap-1"><ShieldAlert size={14} className="text-danger" />Autorizar escrita no Notion (fase futura)</span>} checked={settings.notion_write_enabled} disabled={!settings.notion_enabled} onChange={toggleWrite} />
-              <p className="mt-1 text-xs text-muted">Desativada por padrão. Mesmo ativada, cada escrita exigirá confirmação explícita. Nenhuma escrita está implementada nesta versão.</p>
+              <Checkbox label={<span className="flex items-center gap-1"><ShieldAlert size={14} className="text-danger" />Autorizar escrita no Notion</span>} checked={settings.notion_write_enabled} disabled={!settings.notion_enabled} onChange={toggleWrite} />
+              <p className="mt-1 text-xs text-muted">Desativada por padrão. Mesmo ativada, cada envio mostra o que vai mudar e só acontece com a sua confirmação. Só altera campos de tarefas e KRs seus; nunca cria nem apaga páginas.</p>
             </div>
             {!cfgCheck.ok && (
               <p role="alert" className="rounded-lg border border-danger/60 p-2 text-xs text-danger">Configuração incompleta — {describeConfigProblem(cfgCheck)}. Preencha em <strong>Campos</strong>. A sincronização fica bloqueada até lá.</p>
@@ -188,7 +182,7 @@ export default function Integracoes() {
               <li>Itens do Notion são pessoais (sem instituição) e aparecem em qualquer filtro de instituição.</li>
               <li>Valor fora do mapeamento, KR sem Objetivo ou com vários Objetivos vão para a revisão — nada é adivinhado.</li>
               <li>Se o mesmo item mudou no Notion e na Central, nada é sobrescrito: vira um conflito para você decidir.</li>
-              <li>A Central só lê o Notion. Mudanças feitas aqui não voltam para o Notion nesta versão.</li>
+              <li>Mudanças feitas aqui em itens do Notion ficam pendentes e só vão para o Notion quando você revisar e confirmar o envio (e com a escrita autorizada). Se o Notion também mudou, vira conflito.</li>
             </ol>
           </Card>
         </div>

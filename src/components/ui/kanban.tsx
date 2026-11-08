@@ -10,7 +10,7 @@ type Col<S extends string> = { value: S; label: string; tone?: string };
  * - Celular/tablet: colunas lado a lado com rolagem horizontal DENTRO do quadro (snap por coluna) — a página não rola.
  * - Teclado e leitores de tela: cada cartão tem um seletor "Mover … para".
  */
-export function KanbanBoard<T extends { id: string }, S extends string>({ columns, items, columnOf, onMove, itemLabel, renderCard, moveOptions, emptyText }: {
+export function KanbanBoard<T extends { id: string }, S extends string>({ columns, items, columnOf, onMove, itemLabel, renderCard, moveOptions, emptyText, readOnly }: {
   columns: Col<S>[];
   items: T[];
   columnOf: (item: T) => S;
@@ -20,14 +20,18 @@ export function KanbanBoard<T extends { id: string }, S extends string>({ column
   /** Opções do seletor (padrão: as colunas). */
   moveOptions?: Col<S>[];
   emptyText?: string;
+  /** Só exibição: sem arrastar e sem o seletor "Mover" (ex.: colunas por Objetivo). */
+  readOnly?: boolean;
 }) {
   const [drag, setDrag] = React.useState<string | null>(null);
   const [over, setOver] = React.useState<S | null>(null);
   const opts = moveOptions ?? columns;
-  const drop = (col: S) => { if (drag) onMove(drag, col); setDrag(null); setOver(null); };
+  const drop = (col: S) => { if (drag && !readOnly) onMove(drag, col); setDrag(null); setOver(null); };
+  // Até 4 colunas cabem lado a lado a partir de 1024px; 5 a partir de 1280px; mais que isso, o quadro rola na horizontal.
+  const grid = columns.length <= 4 ? 'lg' : columns.length === 5 ? 'xl' : null;
   return (
     <div className="scrollbar-thin relative -mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
-      <div className="flex snap-x snap-mandatory gap-4 lg:grid lg:snap-none" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
+      <div className={cn('flex snap-x snap-mandatory gap-4', grid === 'lg' && 'lg:grid lg:snap-none', grid === 'xl' && 'xl:grid xl:snap-none')} style={grid ? { gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` } : undefined}>
         {columns.map((col) => {
           const list = items.filter((i) => columnOf(i) === col.value);
           const isOver = over === col.value && drag != null;
@@ -36,7 +40,7 @@ export function KanbanBoard<T extends { id: string }, S extends string>({ column
               onDragOver={(e) => { e.preventDefault(); if (over !== col.value) setOver(col.value); }}
               onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null); }}
               onDrop={() => drop(col.value)}
-              className={cn('flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-2xl border bg-surface/60 p-3 transition-colors sm:w-[300px] lg:w-auto lg:max-w-none',
+              className={cn('flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-2xl border bg-surface/60 p-3 transition-colors sm:w-[300px]', grid === 'lg' && 'lg:w-auto lg:max-w-none', grid === 'xl' && 'xl:w-auto xl:max-w-none',
                 isOver ? 'border-gold-300/50 bg-gold-300/[.04]' : 'border-border/60')}>
               <h2 className="mb-3 flex items-center justify-between gap-2 px-1 font-sans text-sm font-semibold tracking-normal">
                 <span className="flex items-center gap-2">
@@ -46,17 +50,17 @@ export function KanbanBoard<T extends { id: string }, S extends string>({ column
               </h2>
               <ul className="flex min-h-[120px] flex-1 flex-col gap-2.5">
                 {list.map((item) => (
-                  <li key={item.id} draggable onDragStart={(e) => { setDrag(item.id); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => { setDrag(null); setOver(null); }}
-                    className={cn('group relative cursor-grab rounded-xl border border-border/70 bg-surface-2 p-3 text-sm shadow-elev-1 transition hover:border-border hover:bg-surface-3/70 active:cursor-grabbing',
-                      drag === item.id && 'opacity-40')}>
-                    <GripVertical size={14} aria-hidden className="absolute right-2 top-3 text-muted/40 opacity-0 transition group-hover:opacity-100" />
+                  <li key={item.id} draggable={!readOnly} onDragStart={(e) => { setDrag(item.id); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => { setDrag(null); setOver(null); }}
+                    className={cn('group relative rounded-xl border border-border/70 bg-surface-2 p-3 text-sm shadow-elev-1 transition hover:border-border hover:bg-surface-3/70',
+                      !readOnly && 'cursor-grab active:cursor-grabbing', drag === item.id && 'opacity-40')}>
+                    {!readOnly && <GripVertical size={14} aria-hidden className="absolute right-2 top-3 text-muted/40 opacity-0 transition group-hover:opacity-100" />}
                     {renderCard(item)}
-                    <label className="mt-3 block">
+                    {!readOnly && <label className="mt-3 block">
                       <span className="sr-only">Mover {itemLabel(item)} para</span>
                       <select className="field h-7 rounded-lg px-2 py-0 text-[11px] text-muted" value={columnOf(item)} onChange={(e) => onMove(item.id, e.target.value as S)}>
                         {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
-                    </label>
+                    </label>}
                   </li>
                 ))}
                 {list.length === 0 && emptyText && (

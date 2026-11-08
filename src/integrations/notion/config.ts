@@ -57,6 +57,7 @@ export const PROPS = {
     due_date: 'PRAZO',
     responsible: 'RESPONSÁVEL',
     last_edited: 'ÚLTIMA EDIÇÃO',
+    attribution: 'ATRIBUIÇÃO',
   },
   krs: {
     title: 'Resultado Chave (KR)',
@@ -77,6 +78,42 @@ export const PROPS = {
  * Escopo inicial: só itens ativos. O filtro usa o GRUPO do status do Notion (a fazer / em andamento),
  * para que uma opção nova criada nesses grupos chegue e caia em "valor desconhecido" em vez de sumir.
  */
+/**
+ * Status dos KRs na base do Notion (verificados no schema). Na Central o status do KR é o texto exato do Notion;
+ * estes nomes montam as colunas do Kanban. O servidor confere de novo contra o schema vivo antes de escrever.
+ */
+export const KR_STATUS = {
+  a_caminho: 'A caminho',
+  em_analise: '??',
+  atingiu: 'Concluído (Atingiu)',
+  nao_atingiu: [
+    'Não Atingiu - Executou e Não chegou',
+    'Não Atingiu - Não Foi Executado',
+    'Não Atingiu - Prioridade Mudou',
+    'Não Atingiu - Faltou Pessoas',
+    'Não Atingiu - Meta Mal Calibrada',
+  ],
+} as const;
+export const KR_STATUS_OPTIONS: readonly string[] = [KR_STATUS.a_caminho, KR_STATUS.em_analise, KR_STATUS.atingiu, ...KR_STATUS.nao_atingiu];
+export type KrColumn = 'a_caminho' | 'em_analise' | 'atingiu' | 'nao_atingiu';
+/** Coluna do Kanban de um status de KR (sem status = "A caminho", o padrão da base). */
+export function krColumnOf(status: string | null | undefined): KrColumn {
+  const s = (status ?? '').trim();
+  if (!s || s === KR_STATUS.a_caminho) return 'a_caminho';
+  if (s === KR_STATUS.em_analise) return 'em_analise';
+  if (/^conclu/i.test(s)) return 'atingiu';
+  if (/^n[ãa]o atingiu/i.test(s)) return 'nao_atingiu';
+  return 'a_caminho';
+}
+
+/** Opções de ATRIBUIÇÃO das Tarefas no Notion (verificadas no schema), na ordem dos grupos do Notion. */
+export const TASK_ATTRIBUTION_OPTIONS = ['70%', '20%', '10%', 'OFF WORK (INDIVIDUAL)'] as const;
+/** Ordena como no Notion (opções conhecidas primeiro, na ordem acima) e remove repetidos. */
+export function sortAttribution(names: readonly string[] | null | undefined): string[] {
+  const rank = (n: string) => { const i = (TASK_ATTRIBUTION_OPTIONS as readonly string[]).indexOf(n); return i < 0 ? 99 : i; };
+  return [...new Set((names ?? []).map((n) => n.trim()).filter(Boolean))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
 export const ACTIVE_STATUS_GROUPS = ['to_do', 'in_progress'] as const;
 
 /** Mapeamentos aprovados. Valor fora destas tabelas NUNCA recebe padrão: vai para revisão. */
