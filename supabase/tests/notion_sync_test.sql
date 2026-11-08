@@ -58,8 +58,13 @@ do $$ begin
   exception when unique_violation then null; end;
   begin insert into review_queue (entity, external_id, kind) values ('krs', 'k2', 'inventado'); raise exception 'FALHA: kind inválido aceito';
   exception when check_violation then null; end;
-  begin insert into review_queue (entity, external_id) values ('krs', 'k3'); raise exception 'FALHA: review sem kind aceito';
-  exception when not_null_violation then null; end;
+end $$;
+-- Compatibilidade com o código antigo (Production): insert sem kind continua aceito e recebe o tipo legado.
+insert into review_queue (entity, external_id) values ('tarefas', 'legado1');
+do $$ begin
+  if (select kind from review_queue where external_id = 'legado1') <> 'instituicao' then
+    raise exception 'FALHA: insert legado sem kind não recebeu instituicao';
+  end if;
 end $$;
 update review_queue set resolved = true, resolution = 'descartado' where external_id = 'k1' and kind = 'kr_sem_objetivo';
 insert into review_queue (entity, external_id, kind) values ('krs', 'k1', 'kr_sem_objetivo');   -- depois de resolvido, pode voltar
