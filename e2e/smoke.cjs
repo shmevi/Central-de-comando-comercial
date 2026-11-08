@@ -1,7 +1,7 @@
 // Teste de fumaça E2E: node e2e/smoke.cjs [baseURL]  (requer `npm run dev` ativo)
 const { chromium } = require('playwright');
 const BASE = process.argv[2] || 'http://localhost:5173';
-const ROUTES = ['/', '/rotina', '/agenda', '/tarefas', '/recrutamento', '/equipes', '/treinamentos', '/reunioes', '/sistemas', '/okrs', '/projetos', '/relatorios', '/integracoes', '/configuracoes'];
+const ROUTES = ['/', '/rotina', '/agenda', '/tarefas', '/equipes', '/treinamentos', '/reunioes', '/okrs', '/projetos', '/relatorios', '/integracoes', '/configuracoes'];
 let fails = 0;
 const recifeToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Recife' }).format(new Date());
 const isoMinusDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
@@ -84,39 +84,24 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   const dues = (await p.locator('li:has-text("Recorrente E2E")').allInnerTexts()).map((t) => /(\d{2})\/(\d{2})\/(\d{4})/.exec(t)).filter(Boolean).map((m) => `${m[3]}-${m[2]}-${m[1]}`);
   ok(dues.some((d) => d > recifeToday()), `tarefa vencida há 10 dias, concluída hoje: próxima ocorrência cai depois de hoje (${dues.join(', ')})`);
 
-  // Recrutamento
-  await p.goto(BASE + '/recrutamento'); await p.click('button:has-text("Candidato")');
-  await p.fill('role=dialog >> label:has-text("Nome") >> xpath=following-sibling::input', 'Candidato Teste');
-  await p.click('role=dialog >> button:has-text("Salvar")');
-  ok(await p.locator('text=Escolha a instituição da vaga').isVisible(), 'candidato exige instituição');
-  await p.selectOption('role=dialog >> label:has-text("Instituição") >> xpath=following-sibling::select', { label: 'CPPEM' });
-  await p.click('role=dialog >> button:has-text("Salvar")');
-  await p.waitForSelector('section[aria-label="Recebido"] >> text=Candidato Teste');
-  ok(true, 'candidato criado no pipeline');
-  await p.click('button[aria-label="Agendar entrevista para Candidato Teste"]');
-  await p.fill('role=dialog >> label:has-text("Data") >> xpath=following-sibling::input', '2026-11-06');
-  await p.fill('role=dialog >> label:has-text("Início") >> xpath=following-sibling::input', '14:00');
-  await p.fill('role=dialog >> label:has-text("Fim") >> xpath=following-sibling::input', '15:00');
-  await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
-  if (process.env.DEBUG) await p.screenshot({ path: process.env.DEBUG });
-  ok(await p.locator('section[aria-label="Entrevista agendada"] >> text=Candidato Teste').count() >= 1, 'agendar move para "Entrevista agendada"');
-  // conflito
-  await p.getByRole('button', { name: 'Entrevista', exact: true }).click();
-  await p.getByRole('dialog').getByRole('combobox', { name: /^Candidato/ }).selectOption({ label: 'Candidato Teste' });
-  await p.fill('role=dialog >> label:has-text("Data") >> xpath=following-sibling::input', '2026-11-06');
-  await p.fill('role=dialog >> label:has-text("Início") >> xpath=following-sibling::input', '14:30');
-  await p.fill('role=dialog >> label:has-text("Fim") >> xpath=following-sibling::input', '15:30');
-  ok(await p.locator('role=dialog >> text=Conflito de horário').isVisible(), 'detecção de conflito de entrevistas');
-  await p.keyboard.press('Escape');
-  await p.click('role=radio[name="Entrevistas"]');
-  ok(await p.locator('text=a confirmar').count() >= 1, 'horário não confirmado aparece como "a confirmar"');
-  await watchFirstPaint(p, '[role=dialog] textarea');
-  await p.click('button[aria-label="Gerar convite para WhatsApp"]');
-  await p.locator('role=dialog >> textarea').waitFor();
-  ok((await firstPaint(p)).every((v) => v.length > 0), 'convite já aparece preenchido (sem campo vazio no primeiro desenho)');
-  const invite = await p.inputValue('role=dialog >> textarea');
-  ok(invite.includes('data e horário a confirmar') && !invite.includes('14:00'), 'convite não inventa horário');
-  await p.keyboard.press('Escape');
+  // Módulos removidos da interface: sem menu e sem rota (os dados no banco não são tocados)
+  for (const r of ['/recrutamento', '/sistemas']) {
+    await p.goto(BASE + r); await p.waitForTimeout(300);
+    ok(await p.locator('text=Página não encontrada').count() === 1, `${r} não existe mais na interface`);
+  }
+  await p.goto(BASE + '/');
+  ok(await p.locator('nav >> text=Recrutamento').count() === 0 && await p.locator('nav >> text=Sistemas e Melhorias').count() === 0, 'menu sem Recrutamento e Sistemas e Melhorias');
+
+  // Barra lateral: grupos abrem/fecham com setinha (aria-expanded) e o estado persiste
+  const grp = p.locator('aside button[aria-controls="lateral-grupo-gest-o"]');
+  ok(await grp.getAttribute('aria-expanded') === 'true', 'grupo Gestão começa aberto');
+  await grp.click(); await p.waitForTimeout(300);
+  ok(await grp.getAttribute('aria-expanded') === 'false' && await p.locator('#lateral-grupo-gest-o').getAttribute('aria-hidden') === 'true', 'grupo Gestão fecha (aria-expanded=false)');
+  await p.reload(); await p.waitForSelector('text=Missão do dia');
+  ok(await p.locator('aside button[aria-controls="lateral-grupo-gest-o"]').getAttribute('aria-expanded') === 'false', 'grupo fechado continua fechado após recarregar');
+  await p.locator('aside button[aria-controls="lateral-grupo-gest-o"]').click();
+  await p.goto(BASE + '/equipes'); await p.waitForTimeout(300);
+  ok(await p.locator('aside button[aria-controls="lateral-grupo-gest-o"]').getAttribute('aria-expanded') === 'true', 'grupo da página atual fica aberto');
 
   // Rotina: intervalo protegido
   await p.goto(BASE + '/rotina'); await p.waitForTimeout(400);
@@ -154,15 +139,55 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   ok(await p.locator('text=Tarefa de outra pessoa').count() === 0, 'tarefa de outra pessoa não importada');
   await p.selectOption('select[aria-label="Filtrar por instituição"]', 'all');
 
-  // Relatórios: exportar CSV
+  // Origem: Todas / Rotina-Central / Notion — combina com busca, lista e Kanban, sem alterar dados
+  await p.goto(BASE + '/tarefas'); await p.waitForSelector('text=Revisar funil de matrículas');
+  const totalAntes = await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:tasks') || '[]').length);
+  await p.click('role=radio[name^="Notion"]'); await p.waitForTimeout(200);
+  ok(await p.locator('li:has-text("Revisar funil de matrículas")').count() === 1 && await p.locator('li:has-text("Tarefa E2E")').count() === 0, 'filtro Notion mostra só tarefas do Notion');
+  ok(new URL(p.url()).searchParams.get('origem') === 'notion', 'origem fica na URL');
+  await p.fill('#busca', 'funil'); await p.waitForTimeout(150);
+  ok(await p.locator('li:has-text("Revisar funil de matrículas")').count() === 1, 'origem + busca combinam');
+  await p.fill('#busca', '');
+  await p.click('role=radio[name="Kanban"]'); await p.waitForTimeout(200);
+  ok(await p.locator('section[aria-label] li:has-text("Tarefa E2E")').count() === 0 && await p.locator('section[aria-label] li:has-text("funil")').count() >= 1, 'origem vale também no Kanban');
+  await p.click('role=radio[name="Lista"]');
+  await p.click('role=radio[name^="Rotina / Central"]'); await p.waitForTimeout(200);
+  ok(await p.locator('li:has-text("Tarefa E2E")').count() === 1 && await p.locator('li:has-text("Revisar funil de matrículas")').count() === 0, 'filtro Central esconde as do Notion');
+  await p.click('role=radio[name^="Todas"]');
+  ok(await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:tasks') || '[]').length) === totalAntes, 'filtrar não cria nem apaga tarefas');
+
+  // Relatórios: conquista registrada fica salva; CSV e PDF
   await p.goto(BASE + '/relatorios'); await p.waitForSelector('text=Tarefas concluídas');
+  ok(await p.locator('text=Concluídas — Central').count() === 1 && await p.locator('text=Concluídas — Notion').count() === 1, 'relatório diário separa Central e Notion');
+  await p.fill('#entrada-conquista', 'Conquista E2E'); await p.click('button[aria-label="Registrar conquista"]');
+  await p.waitForSelector('li:has-text("Conquista E2E")');
+  await p.fill('#anotacao-final', 'Anotação final E2E'); await p.click('button:has-text("Salvar anotação")'); await p.waitForTimeout(200);
+  await p.reload(); await p.waitForSelector('text=Tarefas concluídas');
+  ok(await p.locator('li:has-text("Conquista E2E")').count() === 1 && await p.inputValue('#anotacao-final') === 'Anotação final E2E', 'conquista e anotação final persistem após recarregar');
+  await p.click('role=radio[name="Semanal"]'); await p.waitForTimeout(200);
+  ok(await p.locator('text=Evolução de OKRs').count() === 1 && await p.locator('text=Prioridades da próxima semana').count() === 1 && await p.locator('li:has-text("Conquista E2E")').count() === 1, 'relatório semanal com OKRs, prioridades e conquistas da semana');
+  await p.click('role=radio[name="Diário"]');
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("CSV")')]);
   ok(dl.suggestedFilename().endsWith('.csv'), 'exporta CSV');
   const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("PDF")')]);
   ok(dl2.suggestedFilename().endsWith('.pdf'), 'exporta PDF');
 
-  // Todas as rotas, desktop + celular, sem rolagem horizontal
-  for (const vp of [{ width: 1366, height: 900 }, { width: 360, height: 780 }]) {
+  // Logo personalizada (modo local): escolher, prévia, persistir e remover
+  await p.goto(BASE + '/configuracoes'); await p.waitForSelector('text=Identidade visual');
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  await p.setInputFiles('input[aria-label="Arquivo da logo"]', { name: 'logo.png', mimeType: 'image/png', buffer: PNG });
+  await p.waitForSelector('text=Logo personalizada em uso.');
+  ok(await p.locator('aside img[alt="Logo da Central"]').count() === 1, 'logo personalizada aparece na barra lateral');
+  await p.reload(); await p.waitForSelector('text=Identidade visual');
+  ok(await p.locator('text=Logo personalizada em uso.').count() === 1, 'logo persiste após recarregar');
+  await p.setInputFiles('input[aria-label="Arquivo da logo"]', { name: 'falsa.png', mimeType: 'image/png', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>') });
+  ok(await p.locator('text=Formato não aceito').waitFor({ timeout: 3000 }).then(() => true, () => false), 'SVG disfarçado de PNG é recusado');
+  await p.click('button:has-text("Remover logo personalizada")'); await p.click('role=dialog >> button:has-text("Remover")');
+  await p.waitForSelector('text=Usando o monograma padrão');
+  ok(await p.locator('aside img[alt="Logo da Central"]').count() === 0, 'sem logo personalizada volta o monograma CP');
+
+  // Todas as rotas em celular (360/390), tablet e desktop, sem rolagem horizontal
+  for (const vp of [{ width: 1366, height: 900 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 360, height: 780 }]) {
     await p.setViewportSize(vp);
     for (const r of ROUTES) {
       await p.goto(BASE + r); await p.waitForTimeout(400);

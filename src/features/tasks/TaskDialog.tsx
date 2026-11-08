@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Dialog } from '@/components/ui/dialog';
+import { Dialog, FormSection } from '@/components/ui/dialog';
+import { NotionBadge } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
 import { useDraft } from '@/components/ui/use-draft';
 import { Checkbox, SelectField, TextArea, TextField } from '@/components/ui/form';
@@ -48,41 +49,56 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
   }
 
   const done = d.checklist.filter((c) => c.done).length;
+  const addItem = () => { if (newItem.trim()) { set('checklist', [...d.checklist, { id: uid(), text: newItem.trim(), done: false }]); setNewItem(''); } };
 
+  const notion = !!task && isFromNotion(task);
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={task ? 'Editar tarefa' : 'Nova tarefa'} wide
-      footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={() => save()} disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</Button></>}>
-      <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
-        {task && isFromNotion(task) && <p className="sm:col-span-2 rounded-lg border border-border p-2 text-xs text-muted">Sincronizada do Notion. Título, status, prioridade e prazo alterados aqui ficam marcados como pendentes de envio — o envio ao Notion é uma fase futura.</p>}
-        <TextField className="sm:col-span-2" label="Título" required value={d.title} onChange={(e) => set('title', e.target.value)} error={err.title} autoFocus />
-        <TextArea className="sm:col-span-2" label="Descrição" value={d.description} onChange={(e) => set('description', e.target.value)} />
-        <InstitutionSelect value={d.institution_id} onChange={(v) => set('institution_id', v)} />
-        <SelectField label="Categoria" value={d.category} onChange={(e) => set('category', e.target.value)} options={settings.categories.map((c) => ({ value: c, label: c }))} />
-        <SelectField label="Prioridade" value={d.priority} onChange={(e) => set('priority', e.target.value as any)} options={Object.entries(PRIORITY).map(([v, p]) => ({ value: v, label: p.label }))} />
-        <SelectField label="Status" value={d.status} onChange={(e) => set('status', e.target.value as any)} options={toOptions(TASK_STATUS)} />
-        <TextField label="Prazo" type="date" value={d.due_date ?? ''} onChange={(e) => set('due_date', e.target.value || null)} error={err.due_date} />
-        <SelectField label="Recorrência" value={d.recurrence} onChange={(e) => set('recurrence', e.target.value as any)} options={toOptions(RECURRENCE)} hint="Ao concluir, a próxima ocorrência é criada." />
-        <fieldset className="sm:col-span-2">
-          <legend className="label">Checklist {d.checklist.length > 0 && `(${done}/${d.checklist.length})`}</legend>
-          <ul className="mb-2 space-y-1">
-            {d.checklist.map((c) => (
-              <li key={c.id} className="flex items-center gap-2">
-                <Checkbox label={<span className={c.done ? 'line-through text-muted' : ''}>{c.text}</span>} checked={c.done} onChange={(v) => set('checklist', d.checklist.map((x) => x.id === c.id ? { ...x, done: v } : x))} className="flex-1" />
-                <Button variant="ghost" size="icon" aria-label={`Remover item ${c.text}`} onClick={() => set('checklist', d.checklist.filter((x) => x.id !== c.id))}><Trash2 size={14} /></Button>
-              </li>
-            ))}
-          </ul>
-          <div className="flex gap-2">
-            <input aria-label="Novo item do checklist" className="field" value={newItem} placeholder="Adicionar item…" onChange={(e) => setNewItem(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newItem.trim()) { set('checklist', [...d.checklist, { id: uid(), text: newItem.trim(), done: false }]); setNewItem(''); } } }} />
-            <Button variant="secondary" size="icon" aria-label="Adicionar item" onClick={() => { if (newItem.trim()) { set('checklist', [...d.checklist, { id: uid(), text: newItem.trim(), done: false }]); setNewItem(''); } }}><Plus size={16} /></Button>
+      badge={notion ? <NotionBadge /> : undefined}
+      description={task ? `Criada em ${fmtDateTime(task.created_at)}` : 'Preencha o essencial; o resto é opcional.'}
+      footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={() => save()} disabled={saving}>{saving ? 'Salvando…' : 'Salvar tarefa'}</Button></>}>
+      <form onSubmit={save} className="space-y-7">
+        {notion && <p className="panel px-3 py-2.5 text-xs text-muted">Sincronizada do Notion. Título, status, prioridade e prazo alterados aqui ficam marcados como pendentes de envio — o envio ao Notion é uma fase futura.</p>}
+        <FormSection title="Essencial">
+          <TextField label="Título" required value={d.title} onChange={(e) => set('title', e.target.value)} error={err.title} autoFocus placeholder="O que precisa ser feito?" />
+          <TextArea label="Descrição" rows={3} value={d.description} onChange={(e) => set('description', e.target.value)} placeholder="Contexto, links, próximos passos…" />
+        </FormSection>
+        <FormSection title="Classificação">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SelectField label="Status" value={d.status} onChange={(e) => set('status', e.target.value as any)} options={toOptions(TASK_STATUS)} />
+            <SelectField label="Prioridade" value={d.priority} onChange={(e) => set('priority', e.target.value as any)} options={Object.entries(PRIORITY).map(([v, p]) => ({ value: v, label: p.label }))} />
+            <InstitutionSelect value={d.institution_id} onChange={(v) => set('institution_id', v)} />
+            <SelectField label="Categoria" value={d.category} onChange={(e) => set('category', e.target.value)} options={[...new Set([...settings.categories, d.category])].map((c) => ({ value: c, label: c }))} />
           </div>
-        </fieldset>
+        </FormSection>
+        <FormSection title="Prazo e repetição">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField label="Prazo" type="date" value={d.due_date ?? ''} onChange={(e) => set('due_date', e.target.value || null)} error={err.due_date} />
+            <SelectField label="Recorrência" value={d.recurrence} onChange={(e) => set('recurrence', e.target.value as any)} options={toOptions(RECURRENCE)} hint="Ao concluir, a próxima ocorrência é criada." />
+          </div>
+        </FormSection>
+        <FormSection title={`Checklist${d.checklist.length > 0 ? ` · ${done}/${d.checklist.length}` : ''}`}>
+          {d.checklist.length > 0 && (
+            <ul className="space-y-1">
+              {d.checklist.map((c) => (
+                <li key={c.id} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-surface-2">
+                  <Checkbox label={<span className={c.done ? 'text-muted line-through' : ''}>{c.text}</span>} checked={c.done} onChange={(v) => set('checklist', d.checklist.map((x) => x.id === c.id ? { ...x, done: v } : x))} className="flex-1" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Remover item ${c.text}`} onClick={() => set('checklist', d.checklist.filter((x) => x.id !== c.id))}><Trash2 size={14} /></Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <input aria-label="Novo item do checklist" className="field" value={newItem} placeholder="Adicionar item e pressionar Enter…" onChange={(e) => setNewItem(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }} />
+            <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" aria-label="Adicionar item" onClick={addItem}><Plus size={16} /></Button>
+          </div>
+        </FormSection>
         {task && task.history?.length > 0 && (
-          <details className="sm:col-span-2 rounded-lg border border-border p-3">
-            <summary className="cursor-pointer text-sm font-semibold">Histórico ({task.history.length})</summary>
-            <ol className="mt-2 space-y-1 text-xs text-muted">
-              {[...task.history].reverse().map((h, i) => <li key={i}><span className="text-fg">{fmtDateTime(h.at)}</span> — {h.action}{h.detail ? ` · ${h.detail}` : ''}</li>)}
+          <details className="panel px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium">Histórico ({task.history.length})</summary>
+            <ol className="mt-3 space-y-1.5 border-l border-border pl-3 text-xs text-muted">
+              {[...task.history].reverse().map((h, i) => <li key={i}><span className="text-fg/90">{fmtDateTime(h.at)}</span> — {h.action}{h.detail ? ` · ${h.detail}` : ''}</li>)}
             </ol>
           </details>
         )}

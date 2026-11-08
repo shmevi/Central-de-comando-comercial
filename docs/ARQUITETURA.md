@@ -19,7 +19,7 @@
 - **Escopo de instituição** global (cabeçalho): todas as telas filtram por instituição para não misturar dados.
   Candidatos, feedbacks e OKRs exigem instituição; o banco valida que a instituição pertence ao mesmo usuário.
 
-- **Componentes compartilhados** (`src/components/ui`): `KanbanBoard` (Tarefas, Recrutamento, Melhorias),
+- **Componentes compartilhados** (`src/components/ui`): `KanbanBoard` (Tarefas),
   `useDraft` (estado dos formulários), `SearchInput`, `DateNav`, `useConfirm().confirmDelete`, `ErrorBoundary`.
 
 ## Stack
@@ -35,11 +35,9 @@ Lucide · Recharts · jsPDF (PDF) · Supabase JS · fontes Inter e Barlow Conden
 | `/rotina` | Minha Rotina | timeline editável, status (planejado/em andamento/concluído/adiado), intervalo protegido com exceção explícita, visões dia/semana, conflitos |
 | `/agenda` | Agenda Semanal | foco por dia, visões dia/semana/mês, eventos + entrevistas + reuniões, detecção de conflitos |
 | `/tarefas` | Tarefas | CRUD, instituição, prioridade, prazo, checklist, recorrência, histórico, lista/Kanban, filtros, busca |
-| `/recrutamento` | Recrutamento | pipeline de 8 etapas, entrevistas, conflitos, presença, decisão, convite copiável (WhatsApp), LGPD |
 | `/equipes` | Equipes e Feedbacks | pessoas multi-instituição, feedback (positivos, a desenvolver, plano, prazo, revisões), acesso restrito |
 | `/treinamentos` | Treinamentos | catálogo, trilhas, presença e nota |
 | `/reunioes` | Reuniões | modelos, pauta, decisões, ata, encaminhamentos (responsável e prazo) → tarefa |
-| `/sistemas` | Sistemas e Melhorias | inventário, Kanban de 6 etapas, proposta × implantação confirmada |
 | `/okrs` | OKRs | objetivos por instituição e ciclo; progresso só com meta válida |
 | `/projetos` | Projetos | etapas, entregas, responsáveis, dependências; "em andamento" exige confirmação |
 | `/relatorios` | Relatórios | diário/semanal, CSV e PDF, "Não preenchido" ≠ zero |
@@ -49,7 +47,15 @@ Lucide · Recharts · jsPDF (PDF) · Supabase JS · fontes Inter e Barlow Conden
 ## Modelo de dados
 
 Todas as tabelas têm `id`, `user_id`, `created_at`, `updated_at`, `is_demo`, `external_ref`.
-Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/0001_central_comando.sql`.
+Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/` (0001 base, 0002 Notion, 0003 relatórios/logo).
+
+> **Recrutamento** e **Sistemas e Melhorias** foram retirados da interface (menu, rotas e telas). As tabelas
+> `candidates`, `interviews`, `systems` e `improvements` **continuam no banco com os dados intactos** e entram no backup.
+
+| Tabela (0003) | Campos-chave | Regras |
+|---|---|---|
+| report_entries | date, kind (conquista, destaque, pendencia, anotacao, prioridade), text, institution_id | RLS por usuário; texto 1–4000 caracteres |
+| settings.logo_path | caminho no bucket `branding` | sem URL/`data:`; Storage só na pasta `<user_id>/` |
 
 | Tabela | Campos-chave | Regras no banco |
 |---|---|---|

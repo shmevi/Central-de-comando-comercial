@@ -57,8 +57,11 @@ Nenhum projeto Supabase foi criado ou conectado por este repositório. Siga na o
 ### 1. Supabase (banco e login)
 
 1. Em [supabase.com/dashboard](https://supabase.com/dashboard), crie um **projeto novo** (região *South America (São Paulo)*). Guarde a senha do banco.
-2. **Criar as tabelas** — menu **SQL Editor** → *New query* → cole todo o conteúdo de
-   `supabase/migrations/0001_central_comando.sql` → **Run**. Rode **uma vez só** (rodar de novo dá erro “already exists”).
+2. **Criar as tabelas** — menu **SQL Editor** → *New query* → rode, **em ordem**, cada arquivo de `supabase/migrations/`:
+   - `0001_central_comando.sql` — esquema base + RLS. Rode **uma vez só** (rodar de novo dá erro “already exists”).
+   - `0002_notion_sync.sql` — sincronização Notion (`notion_sync_state`, fila de revisão).
+   - `0003_relatorios_e_logo.sql` — conquistas/anotações dos relatórios (`report_entries`), coluna `settings.logo_path`
+     e o bucket privado **branding** do Storage (logo personalizada), com regras por usuário. Não apaga nada; pode ser reaplicada.
 3. **Fechar o cadastro público** — **Authentication → Sign In / Providers** → desligue **Allow new users to sign up**.
    Deixe **Email** ligado e **Confirm email** ligado.
 4. **Criar o seu usuário** — **Authentication → Users → Add user → Create new user**: e-mail, senha forte e marque
@@ -90,6 +93,14 @@ Abra o site e entre com o usuário do passo 1.4. O sistema cria sozinho as 3 ins
 iniciais (04, 05 e 06/11/2026). Se você já usava o modo local: **Configurações → Exportar backup** no navegador antigo e
 **Importar backup** depois de entrar no Supabase.
 
+## Personalização
+
+- **Logo:** Configurações → Identidade visual → *Escolher imagem* (PNG, JPG/JPEG ou WEBP; até 2 MB no Supabase).
+  Fica no Storage (bucket privado `branding`, pasta da sua conta) e aparece em todos os seus dispositivos. *Remover logo
+  personalizada* volta ao monograma CP. No modo local, a imagem fica só no navegador (até 700 KB).
+- **Fonte de identidade (Capture It):** coloque o arquivo em `src/assets/fonts/capture-it.woff2` (ou `.woff`/`.ttf`) —
+  veja `src/assets/fonts/README.md` e a licença ao lado. Sem o arquivo, os títulos usam Barlow Condensed, sem erro.
+
 ## Segurança (resumo)
 
 - **RLS** forçado em todas as tabelas: cada usuário só lê e altera as próprias linhas; o `user_id` é definido pelo banco.
@@ -114,7 +125,7 @@ src/
   integrations/   Notion: contrato do adaptador, adaptador de demonstração, sincronização
   lib/            datas/fuso, jornada, conflitos, OKR, PIN, convite WhatsApp
   pages/          uma tela por módulo
-supabase/         migration (esquema + RLS) e testes de RLS
+supabase/         migrations 0001–0003 (esquema, Notion, relatórios/logo + RLS e Storage) e testes de RLS
 e2e/              testes no navegador e servidor que imita a hospedagem
 scripts/          gerador de vercel.json / netlify.toml
 docs/             arquitetura, checklist de testes, status funcional

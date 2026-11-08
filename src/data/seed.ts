@@ -44,7 +44,7 @@ async function doSeed() {
 
 /** Dados FICTÍCIOS para explorar o app. Todos marcados is_demo = true. */
 export async function seedDemo() {
-  await Promise.all(['institutions', 'people', 'candidates'].map((c) => load(c as any)));
+  await Promise.all(['institutions', 'people'].map((c) => load(c as any)));
   const insts = await repo('institutions').list();
   const inst = insts[0]?.id ?? null;
   const t = todayISO();
@@ -52,10 +52,7 @@ export async function seedDemo() {
   const p1 = await actions.create('people', { ...demo, name: 'Pessoa Demonstração A', role: 'Consultor(a) comercial', email: '', phone: '', institution_ids: inst ? [inst] : [], active: true, notes: '' });
   await actions.create('people', { ...demo, name: 'Pessoa Demonstração B', role: 'Consultor(a) comercial', email: '', phone: '', institution_ids: insts.slice(0, 2).map((i) => i.id), active: true, notes: '' });
   await actions.create('feedbacks', { ...demo, person_id: p1.id, institution_id: inst, date: t, positives: 'Exemplo: boa abordagem inicial.', to_develop: 'Exemplo: contorno de objeções de preço.', action_plan: 'Exemplo: role-play semanal.', deadline: addDays(t, 14), status: 'aberto', reviews: [], confidential: true });
-  for (const [n, stage] of [['Candidato(a) Demonstração 1', 'recebido'], ['Candidato(a) Demonstração 2', 'triagem'], ['Candidato(a) Demonstração 3', 'selecionado']] as const)
-    await actions.create('candidates', { ...demo, name: n, phone: '', email: '', position: 'Consultor(a) de vendas', institution_id: inst, stage, source: 'Demonstração', notes: '', consent_lgpd: false, consent_at: null, retention_until: null, history: [] });
   await actions.create('objectives', { ...demo, title: 'Objetivo de demonstração', institution_id: inst, cycle: '2026-T4', owner: 'Coordenação', key_results: [{ id: 'kr1', title: 'Exemplo de KR com meta', start: 0, target: 100, current: 40, unit: 'matrículas' }, { id: 'kr2', title: 'Exemplo de KR sem meta definida', start: 0, target: null, current: null, unit: '' }] });
-  await actions.create('systems', { ...demo, name: 'CRM (demonstração)', purpose: 'Exemplo de sistema', owner: '', institution_ids: inst ? [inst] : [], status: 'ativo', url: '' });
 }
 
 export async function removeDemo() {

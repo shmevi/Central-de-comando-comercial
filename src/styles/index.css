@@ -5,19 +5,44 @@
 
 @layer base {
   html { -webkit-text-size-adjust: 100%; }
-  body { @apply bg-bg text-fg font-sans antialiased; margin: 0; overflow-x: hidden; }
-  h1, h2, h3, h4 { @apply font-display uppercase font-bold tracking-wide; }
+  body { @apply bg-bg text-fg font-sans antialiased; margin: 0; overflow-x: hidden; font-feature-settings: 'cv11', 'ss01'; }
+  h1, h2, h3, h4 { @apply font-display font-bold tracking-wide; }
+  h1 { @apply uppercase; }
   *:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; border-radius: 6px; }
   ::selection { background: rgb(var(--gold-300) / .35); }
   input, select, textarea { font: inherit; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  }
 }
 
 @layer components {
-  .card { @apply bg-surface border border-border rounded-xl; }
-  .label { @apply block text-xs font-semibold uppercase tracking-wider text-muted mb-1; }
-  .field { @apply w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-fg placeholder:text-muted/70 focus:border-gold-300 focus:outline-none focus-visible:outline-2; }
-  .chip { @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium; }
-  .demo-badge { @apply chip border-orange/50 text-orange bg-orange/10 uppercase tracking-wider; }
+  /* Superfícies */
+  .card { @apply rounded-2xl border border-border/70 bg-surface; box-shadow: var(--elev-1); }
+  .card-interactive { @apply transition hover:border-border hover:bg-surface-2/60; }
+  .panel { @apply rounded-xl border border-border/60 bg-surface-2/50; }
+
+  /* Formulários */
+  .label { @apply mb-1.5 block text-xs font-medium text-muted; }
+  .field {
+    @apply h-10 w-full rounded-xl border border-border bg-surface-2/60 px-3 text-sm text-fg transition
+           placeholder:text-muted/60 hover:border-muted/40 focus:border-gold-300/70 focus:bg-surface-2 focus:outline-none;
+  }
+  textarea.field { @apply h-auto py-2.5; }
+  .field:focus { box-shadow: 0 0 0 3px rgb(var(--gold-300) / .14); }
+  .field[aria-invalid='true'] { @apply border-danger/70; }
+
+  /* Selos */
+  .chip { @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium leading-4; }
+  .demo-badge { @apply chip border-orange/40 bg-orange/10 uppercase tracking-wider text-orange; }
+
+  /* Tipografia de identidade */
+  .brand-title { @apply font-brand uppercase tracking-[.04em]; }
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[.18em] text-muted; }
   .text-gold { color: rgb(var(--gold-text)); }
   .on-gold { color: rgb(var(--on-gold)); }
+}
+
+@layer utilities {
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgb(var(--border)) transparent; }
 }

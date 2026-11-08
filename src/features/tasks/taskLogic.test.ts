@@ -31,3 +31,21 @@ describe('tarefas', () => {
     expect(missionFor(list, '2026-11-05').map((x) => x.id)).toEqual(['a']);
   });
 });
+
+import { matchesOrigin, taskOrigin } from './taskLogic';
+describe('origem da tarefa (Central × Notion)', () => {
+  it('Notion quando external_ref começa com notion:', () => {
+    expect(taskOrigin({ external_ref: 'notion:abc' })).toBe('notion');
+    expect(taskOrigin({ external_ref: null })).toBe('central');
+    expect(taskOrigin({ external_ref: 'outro:abc' })).toBe('central');
+    expect(taskOrigin({})).toBe('central');
+  });
+  it('filtro "todas" não esconde nada; os outros separam sem alterar os dados', () => {
+    const items = [{ external_ref: 'notion:a' }, { external_ref: null }];
+    const snapshot = JSON.stringify(items);
+    expect(items.filter((t) => matchesOrigin(t, 'todas'))).toHaveLength(2);
+    expect(items.filter((t) => matchesOrigin(t, 'notion'))).toEqual([{ external_ref: 'notion:a' }]);
+    expect(items.filter((t) => matchesOrigin(t, 'central'))).toEqual([{ external_ref: null }]);
+    expect(JSON.stringify(items)).toBe(snapshot);
+  });
+});

@@ -11,11 +11,9 @@ import Login, { ConfigError, SetPassword } from '@/pages/Login';
 const Rotina = lazy(() => import('@/pages/Rotina'));
 const Agenda = lazy(() => import('@/pages/Agenda'));
 const Tarefas = lazy(() => import('@/pages/Tarefas'));
-const Recrutamento = lazy(() => import('@/pages/Recrutamento'));
 const Equipes = lazy(() => import('@/pages/Equipes'));
 const Treinamentos = lazy(() => import('@/pages/Treinamentos'));
 const Reunioes = lazy(() => import('@/pages/Reunioes'));
-const Sistemas = lazy(() => import('@/pages/Sistemas'));
 const Okrs = lazy(() => import('@/pages/Okrs'));
 const Projetos = lazy(() => import('@/pages/Projetos'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
@@ -40,11 +38,9 @@ function Gate() {
             <Route path="rotina" element={<Rotina />} />
             <Route path="agenda" element={<Agenda />} />
             <Route path="tarefas" element={<Tarefas />} />
-            <Route path="recrutamento" element={<Recrutamento />} />
             <Route path="equipes" element={<Equipes />} />
             <Route path="treinamentos" element={<Treinamentos />} />
             <Route path="reunioes" element={<Reunioes />} />
-            <Route path="sistemas" element={<Sistemas />} />
             <Route path="okrs" element={<Okrs />} />
             <Route path="projetos" element={<Projetos />} />
             <Route path="relatorios" element={<Relatorios />} />

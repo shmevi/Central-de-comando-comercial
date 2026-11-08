@@ -14,7 +14,7 @@ function AuthCard({ subtitle, children }: { subtitle: string; children: React.Re
       <div className="card w-full max-w-sm space-y-4 p-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <Monogram size={56} />
-          <h1 className="text-2xl text-gold">Central de Comando Comercial</h1>
+          <h1 className="brand-title text-2xl">Central de Comando <span className="text-gold">Comercial</span></h1>
           <p className="text-sm text-muted">{subtitle}</p>
         </div>
         {children}

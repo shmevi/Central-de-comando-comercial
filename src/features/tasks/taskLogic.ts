@@ -1,4 +1,5 @@
 import type { Recurrence, Task, TaskStatus } from '@/domain/types';
+import { isFromNotion } from '@/integrations/notion/mapping';
 import { TASK_STATUS as TASK_STATUS_LABEL } from '@/domain/labels';
 import { addDays, isWeekend } from '@/lib/time';
 import { nowIso } from '@/lib/utils';
@@ -48,3 +49,9 @@ export const withHistory = (t: Pick<Task, 'history'>, action: string, detail?: s
 export function emptyTask(): Omit<Task, 'id' | 'created_at' | 'updated_at'> {
   return { title: '', description: '', institution_id: null, priority: 'media', status: 'a_fazer', due_date: null, category: 'Geral', checklist: [], recurrence: 'nenhuma', is_mission: false, mission_date: null, completed_at: null, history: [] };
 }
+
+/** Origem da tarefa: sincronizada do Notion (external_ref "notion:…") ou criada na Central/rotina. */
+export type TaskOrigin = 'central' | 'notion';
+export const taskOrigin = (t: Pick<Task, 'external_ref'>): TaskOrigin => (isFromNotion(t) ? 'notion' : 'central');
+/** Filtro de origem; 'todas' não filtra. Não altera nem duplica dados — só decide o que aparece. */
+export const matchesOrigin = (t: Pick<Task, 'external_ref'>, origin: 'todas' | TaskOrigin) => origin === 'todas' || taskOrigin(t) === origin;

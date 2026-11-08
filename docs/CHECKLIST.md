@@ -18,7 +18,7 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [A] Missão do dia aceita no máximo 3 tarefas e avisa ao exceder
 - [M] Rotina do dia gerada automaticamente em dia útil; bloco atual destacado com "Agora"
 - [M] Anotação rápida: criar com Enter, excluir
-- [M] Indicadores de abertas/atrasadas/vencem hoje/entrevistas batem com Tarefas e Recrutamento
+- [M] Indicadores de abertas/atrasadas/vencem hoje/concluídas hoje batem com Tarefas
 
 ## Minha Rotina
 - [A] Intervalo não pode ser excluído; bloco que invade o intervalo exige exceção explícita + motivo
@@ -43,13 +43,17 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [M] Arrastar entre colunas do Kanban ou usar o seletor "Mover"
 - [M] Excluir pede confirmação
 
-## Recrutamento
-- [A] Candidato exige instituição; agendar entrevista move para "Entrevista agendada"
-- [A] Conflito de horário entre entrevistas detectado
-- [A] Horário não confirmado aparece como "a confirmar"; convite não inventa horário
-- [M] Copiar convite (nada é enviado); aviso quando falta consentimento LGPD
-- [M] Presença (pendente/confirmada/compareceu/faltou) e decisão atualizam a etapa do candidato
-- [M] Prazo de retenção vencido sinalizado; exclusão do candidato remove também suas entrevistas
+## Navegação e identidade
+- [A] Recrutamento e Sistemas e Melhorias fora do menu e das rotas (dados preservados no banco)
+- [A] Grupos da barra lateral abrem/fecham (aria-expanded), lembram o estado e o grupo da página atual fica aberto
+- [A] Logo: escolher PNG, prévia, persistir após recarregar, recusar SVG disfarçado, remover e voltar ao monograma
+- [A] Modo Supabase: logo no Storage na pasta do usuário; outro usuário não herda; conquistas em report_entries
+- [A] Storage/RLS (PostgreSQL): bucket privado com limite e tipos; ninguém lê/grava/apaga a pasta de outro usuário
+- [M] Fonte Capture It aparece na marca e nos títulos depois que o arquivo for adicionado em src/assets/fonts/
+
+## Tarefas — origem
+- [A] Todas / Rotina-Central / Notion (external_ref "notion:") com contadores; combina com busca, filtros, lista e Kanban
+- [A] Filtrar não cria nem apaga tarefas
 
 ## Equipes e Feedbacks
 - [M] Pessoa exige ao menos uma instituição; feedback exige instituição vinculada à pessoa
@@ -60,8 +64,7 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [M] Modelo preenche título, pauta e duração; encaminhamento exige responsável; "Criar tarefa" gera tarefa com a instituição da reunião
 - [M] Treinamento: participantes filtrados pela instituição, presença e nota (0–10), progresso por trilha
 
-## Sistemas e Melhorias / OKRs / Projetos
-- [M] Melhoria só pode ser "implantada" na etapa Concluído e com data; mover para trás volta a "proposta"
+## OKRs / Projetos
 - [A] KR sem meta, ou meta igual ao valor inicial, não mostra progresso
 - [M] OKR exige instituição e ciclo no formato 2026-T4
 - [M] Projeto "em andamento" exige confirmação explícita; etapa com dependência pendente fica bloqueada

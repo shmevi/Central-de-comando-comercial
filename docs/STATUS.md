@@ -1,9 +1,13 @@
 # Status: funcional × demonstração
 
 ## Funcional (dados reais do usuário, persistidos)
-- **Hoje, Minha Rotina, Agenda, Tarefas, Recrutamento** (MVP) — CRUD completo, filtros, busca, conclusão,
+- **Hoje, Minha Rotina, Agenda, Tarefas** (com filtro de origem Todas / Rotina-Central / Notion) — CRUD completo, filtros, busca, conclusão,
   reagendamento, conflitos, persistência.
-- **Equipes e Feedbacks, Treinamentos, Reuniões, Sistemas e Melhorias, OKRs, Projetos** — CRUD completo com validações.
+- **Equipes e Feedbacks, Treinamentos, Reuniões, OKRs, Projetos** — CRUD completo com validações.
+- **Relatórios** diário (resumo, concluídas Central × Notion, conquistas, destaques, pendências para amanhã, anotação final)
+  e semanal (principais concluídas, conquistas, evolução de OKRs, pendências, prioridades da próxima semana), com PDF/CSV.
+- **Logo personalizada** (Supabase Storage) e **fonte de identidade** (aguarda o arquivo `Capture it`, ver `src/assets/fonts/`).
+- **Removidos da interface:** Recrutamento e Sistemas e Melhorias. Os dados no banco foram preservados.
 - **Relatórios** diário/semanal com exportação **CSV** e **PDF**.
 - **Configurações** — jornada, instituições, categorias, foco semanal, modelo de rotina, tema, permissões, backup.
 - **Persistência local** (navegador) pronta para uso.

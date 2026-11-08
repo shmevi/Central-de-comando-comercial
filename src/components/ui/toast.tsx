@@ -26,7 +26,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <div aria-live="polite" className="pointer-events-none fixed bottom-20 left-1/2 z-[60] flex w-[calc(100vw-32px)] max-w-sm -translate-x-1/2 flex-col gap-2 lg:bottom-4">
         {items.map((t) => (
-          <div key={t.id} role={t.kind === 'erro' ? 'alert' : 'status'} className={cn('card pointer-events-auto px-4 py-3 text-sm shadow-xl', t.kind === 'erro' ? 'border-danger/60' : t.kind === 'ok' ? 'border-gold-300/60' : '')}>
+          <div key={t.id} role={t.kind === 'erro' ? 'alert' : 'status'} className={cn('card pointer-events-auto animate-slide-up border-l-[3px] bg-surface-2 px-4 py-3 text-sm shadow-elev-2', t.kind === 'erro' ? 'border-l-danger' : t.kind === 'ok' ? 'border-l-success' : 'border-l-info')}>
             {t.message}
           </div>
         ))}

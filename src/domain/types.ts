@@ -310,6 +310,15 @@ export interface NotionConfig {
   last_sync_at: string | null;
 }
 
+/** Entradas manuais dos relatórios. 'prioridade' usa a segunda-feira da semana a que se refere. */
+export type ReportEntryKind = 'conquista' | 'destaque' | 'pendencia' | 'anotacao' | 'prioridade';
+export interface ReportEntry extends BaseEntity {
+  date: string; // yyyy-mm-dd
+  kind: ReportEntryKind;
+  text: string;
+  institution_id: ID | null;
+}
+
 export interface Settings extends BaseEntity {
   theme: 'dark' | 'light' | 'system';
   workday_start: string;
@@ -327,6 +336,8 @@ export interface Settings extends BaseEntity {
   /** Pode faltar em configurações salvas antes da migration 0002: use resolveNotionConfig(). */
   notion_config?: Partial<NotionConfig>;
   display_name: string;
+  /** Logo personalizada: caminho no Storage (bucket "branding") ou data URL no modo local. null = monograma CP. */
+  logo_path?: string | null;
   permissions: { feedbacks_restricted: boolean; feedback_pin: string };
 }
 
@@ -350,6 +361,7 @@ export interface EntityMap {
   sync_logs: SyncLog;
   review_queue: ReviewQueueItem;
   notion_sync_state: NotionSyncState;
+  report_entries: ReportEntry;
   settings: Settings;
 }
 
@@ -357,5 +369,5 @@ export type Collection = keyof EntityMap;
 export const COLLECTIONS: Collection[] = [
   'institutions', 'tasks', 'routine_templates', 'routine_blocks', 'agenda_events', 'notes',
   'people', 'feedbacks', 'candidates', 'interviews', 'trainings', 'meetings', 'systems',
-  'improvements', 'objectives', 'projects', 'sync_logs', 'review_queue', 'notion_sync_state', 'settings',
+  'improvements', 'objectives', 'projects', 'sync_logs', 'review_queue', 'notion_sync_state', 'report_entries', 'settings',
 ];

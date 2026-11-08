@@ -106,7 +106,7 @@ export default function Okrs() {
           {list.map((o) => {
             const p = objectiveProgress(o.key_results);
             return (
-              <li key={o.id}><Card className="p-4">
+              <li key={o.id}><Card className="p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div><div className="font-semibold">{o.title} {o.is_demo && <DemoBadge />}</div><div className="flex flex-wrap gap-1 text-xs text-muted">{isPersonalNotion(o) ? <Badge className="border-dashed">Pessoal</Badge> : <InstitutionBadge id={o.institution_id} />}{isFromNotion(o) && <NotionBadge />}<span className="chip border-border">{o.cycle || 'Sem ciclo'}</span>{o.owner && <span>{o.owner}</span>}</div></div>
                   <div className="flex"><Button variant="ghost" size="icon" aria-label={`Editar ${o.title}`} onClick={() => setEditing(o)}><Pencil size={15} /></Button>

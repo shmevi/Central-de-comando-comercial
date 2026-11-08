@@ -18,21 +18,17 @@ import { hitsBreak } from '@/lib/workday';
 import { cn } from '@/lib/utils';
 
 const KINDS: Record<AgendaKind, string> = { compromisso: 'Compromisso', reuniao: 'Reunião', entrevista: 'Entrevista', treinamento: 'Treinamento', foco: 'Bloco de foco' };
-type Item = { id: string; date: string; start: string; end: string; title: string; kind: string; institution_id: string | null; source: 'evento' | 'entrevista' | 'reuniao'; ref?: AgendaEvent; is_demo?: boolean; tentative?: boolean };
+type Item = { id: string; date: string; start: string; end: string; title: string; kind: string; institution_id: string | null; source: 'evento' | 'reuniao'; ref?: AgendaEvent; is_demo?: boolean; tentative?: boolean };
 
 function useAgendaItems() {
   const events = useCollection('agenda_events');
-  const interviews = useCollection('interviews');
   const meetings = useCollection('meetings');
-  const candidates = useCollection('candidates');
   const { matches } = useScope();
-  const cname = Object.fromEntries(candidates.items.map((c) => [c.id, c.name]));
   const items: Item[] = [
     ...events.items.map((e) => ({ id: e.id, date: e.date, start: e.start, end: e.end, title: e.title, kind: KINDS[e.kind], institution_id: e.institution_id, source: 'evento' as const, ref: e, is_demo: e.is_demo })),
-    ...interviews.items.filter((i) => i.date).map((i) => ({ id: i.id, date: i.date, start: i.start || '00:00', end: i.end || i.start || '00:00', title: `Entrevista: ${cname[i.candidate_id] ?? '—'}`, kind: 'Entrevista', institution_id: i.institution_id, source: 'entrevista' as const, is_demo: i.is_demo, tentative: !i.time_confirmed })),
     ...meetings.items.map((m) => ({ id: m.id, date: m.date, start: m.start, end: m.end, title: m.title, kind: 'Reunião', institution_id: m.institution_id, source: 'reuniao' as const, is_demo: m.is_demo })),
   ].filter((i) => matches(i.institution_id));
-  return { items, loading: events.loading || interviews.loading || meetings.loading, events };
+  return { items, loading: events.loading || meetings.loading, events };
 }
 
 function EventDialog({ open, onOpenChange, event, date, all }: { open: boolean; onOpenChange: (o: boolean) => void; event: AgendaEvent | null; date: string; all: Item[] }) {
@@ -79,7 +75,7 @@ function EventDialog({ open, onOpenChange, event, date, all }: { open: boolean; 
 function ItemChip({ i, conflict, onClick }: { i: Item; conflict: boolean; onClick?: () => void }) {
   return (
     <button type="button" onClick={onClick} disabled={!onClick}
-      className={cn('w-full rounded-md border px-2 py-1 text-left text-xs', conflict ? 'border-danger/60 bg-danger/10' : i.source === 'entrevista' ? 'border-info/50 bg-info/10' : i.source === 'reuniao' ? 'border-orange/50 bg-orange/10' : 'border-gold-300/50 bg-gold-300/10', onClick && 'hover:brightness-125')}>
+      className={cn('w-full rounded-md border px-2 py-1 text-left text-xs', conflict ? 'border-danger/60 bg-danger/10' : i.source === 'reuniao' ? 'border-orange/50 bg-orange/10' : 'border-gold-300/50 bg-gold-300/10', onClick && 'hover:brightness-125')}>
       <span className="font-mono">{i.tentative ? 'a conf.' : i.start}</span> {i.title}
     </button>
   );
@@ -111,12 +107,12 @@ export default function Agenda() {
         onNext={() => setDate(view === 'mes' ? shiftMonth(date, 1) : addDays(date, step))}>
         {totalConflicts > 0 && <span className="chip border-danger/60 text-danger"><AlertTriangle size={12} />{totalConflicts} item(ns) em conflito</span>}
         <span className="ml-auto flex flex-wrap gap-2 text-xs text-muted">
-          <span className="chip border-gold-300/50">Evento</span><span className="chip border-info/50">Entrevista</span><span className="chip border-orange/50">Reunião</span>
+          <span className="chip border-gold-300/50">Evento</span><span className="chip border-orange/50">Reunião</span>
         </span>
       </DateNav>
 
       {loading ? <Loading /> : view === 'dia' ? (
-        <Card className="p-4">
+        <Card className="p-5">
           {focus(date) && <p className="mb-3 text-sm">Foco modelo: <strong className="text-gold">{focus(date)}</strong></p>}
           {dayItems(date).length === 0 ? <EmptyState title="Dia livre" description="Nenhum compromisso nesta data." action={<Button size="sm" onClick={() => setCreating(date)}><Plus size={14} />Evento</Button>} /> : (
             <ul className="space-y-2">
@@ -138,7 +134,7 @@ export default function Agenda() {
             {weekDates(date).map((d) => (
               <section key={d} className={cn('card flex min-h-[260px] flex-col p-2', d === now.date && 'border-gold-300', isWeekend(d) && 'opacity-70')} aria-label={fmtLongDate(d)}>
                 <button type="button" onClick={() => { setDate(d); setView('dia'); }} className="mb-1 text-left">
-                  <h2 className="text-sm text-gold">{WEEKDAYS_SHORT[weekdayOf(d)]} {fmtDate(d).slice(0, 5)}</h2>
+                  <h2 className="font-sans text-sm font-semibold tracking-normal">{WEEKDAYS_SHORT[weekdayOf(d)]} {fmtDate(d).slice(0, 5)}</h2>
                   <p className="text-[11px] text-muted">{isWeekend(d) ? 'Sem expediente' : focus(d) ?? ''}</p>
                 </button>
                 <ul className="flex flex-1 flex-col gap-1">{dayItems(d).map((i) => <li key={i.id}><ItemChip i={i} conflict={conflicts.has(i.id)} onClick={onItem(i)} /></li>)}</ul>

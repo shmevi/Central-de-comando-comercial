@@ -83,7 +83,7 @@ export default function Projetos() {
             const prog = projectProgress(p);
             const statusLabel = p.status === 'em_andamento' && !p.status_confirmed ? 'Andamento não confirmado' : STATUS[p.status];
             return (
-              <li key={p.id}><Card className="p-4">
+              <li key={p.id}><Card className="p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div><div className="font-semibold">{p.name} {p.is_demo && <DemoBadge />}</div>
                     <div className="flex flex-wrap gap-1 text-xs text-muted"><InstitutionBadge id={p.institution_id} /><span className={cn('chip', p.status === 'concluido' ? 'border-success/60 text-success' : p.status === 'em_andamento' && p.status_confirmed ? 'border-gold-300/60 text-gold' : 'border-border')}>{statusLabel}</span>

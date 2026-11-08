@@ -4,16 +4,17 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-display uppercase font-bold tracking-wider transition disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold transition-all active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2',
   {
     variants: {
       variant: {
-        primary: 'bg-gold-gradient on-gold shadow-[0_6px_20px_-8px_rgb(var(--gold-300)/.6)] hover:brightness-110',
-        secondary: 'border border-gold-300/70 text-gold hover:bg-gold-300/10',
-        ghost: 'text-fg hover:bg-surface-2',
-        danger: 'border border-danger/60 text-danger hover:bg-danger/10',
+        // Dourado só na ação principal da tela.
+        primary: 'bg-gold-gradient on-gold shadow-[0_8px_24px_-12px_rgb(var(--gold-300)/.7)] hover:brightness-[1.06]',
+        secondary: 'border border-border bg-surface-2/70 text-fg hover:border-gold-300/40 hover:bg-surface-3',
+        ghost: 'text-muted hover:bg-surface-2 hover:text-fg',
+        danger: 'border border-danger/40 text-danger hover:bg-danger/10',
       },
-      size: { sm: 'h-8 px-3 text-sm rounded-lg', md: 'h-10 px-4 text-[15px] rounded-xl', icon: 'h-9 w-9 rounded-lg' },
+      size: { sm: 'h-8 px-3 text-xs rounded-lg', md: 'h-10 px-4 rounded-xl', icon: 'h-9 w-9 rounded-lg' },
     },
     defaultVariants: { variant: 'primary', size: 'md' },
   },

@@ -110,7 +110,7 @@ export default function Reunioes() {
         <div className="grid gap-5 lg:grid-cols-[1fr_340px] [&>*]:min-w-0">
           <ul className="space-y-2">
             {list.map((m) => (
-              <li key={m.id}><Card className="p-4">
+              <li key={m.id}><Card className="p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div><div className="font-semibold">{m.title} {m.is_demo && <DemoBadge />}</div>
                     <div className="flex flex-wrap gap-1 text-xs text-muted">{fmtDate(m.date)} · {m.start}–{m.end} <InstitutionBadge id={m.institution_id} />{m.decisions ? <span className="chip border-success/50 text-success">Com decisões</span> : <span className="chip border-border">Sem ata</span>}</div></div>
@@ -121,8 +121,8 @@ export default function Reunioes() {
               </Card></li>
             ))}
           </ul>
-          <Card className="h-fit p-4">
-            <h2 className="mb-2 text-lg text-gold">Encaminhamentos pendentes</h2>
+          <Card className="h-fit p-5">
+            <h2 className="mb-3 font-sans text-base font-semibold tracking-normal">Encaminhamentos pendentes</h2>
             {pending.length === 0 ? <p className="text-sm text-muted">Nenhum pendente.</p> : (
               <ul className="space-y-2 text-sm">{pending.map((a) => (
                 <li key={a.id} className="rounded-lg bg-surface-2/60 p-2">

@@ -1,6 +1,7 @@
 /* ==========================================================
    DESIGN TOKENS — Central de Comando Comercial
-   Inspirados na identidade observada em cppem.com.br (aprox.).
+   Identidade escura/dourada (aprox. cppem.com.br), refinada para painel:
+   superfícies em camadas, bordas sutis e dourado só para destaque.
    Valores em canais RGB para permitir opacidade no Tailwind.
    ========================================================== */
 :root,
@@ -9,6 +10,7 @@
   --bg: 11 11 13;          /* #0B0B0D */
   --surface: 20 20 22;     /* #141416 */
   --surface-2: 28 28 32;   /* #1C1C20 */
+  --surface-3: 36 36 41;   /* elevação (hover, item ativo) */
   --border: 42 42 48;      /* #2A2A30 */
   --fg: 243 239 230;       /* #F3EFE6 creme */
   --muted: 163 158 146;    /* #A39E92 cinza-quente */
@@ -16,7 +18,7 @@
   --gold-300: 212 175 90;  /* #D4AF5A */
   --gold-500: 212 175 90;
   --gold-700: 140 107 46;  /* #8C6B2E */
-  --gold-text: 243 216 142;/* texto dourado legível no fundo */
+  --gold-text: 233 205 132;/* texto dourado legível (AA) */
   --orange: 233 133 43;    /* #E9852B */
   --success: 110 200 140;
   --warning: 233 170 60;
@@ -25,14 +27,18 @@
   --on-gold: 20 16 8;
   --focus: 243 216 142;
   --chart-1: 176 138 61;   /* validado: banda L e contraste ≥3:1 sobre #141416 */
+  --shadow: 0 0 0;
+  --elev-1: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 10px 30px -18px rgb(0 0 0 / 0.8);
+  --elev-2: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 24px 60px -20px rgb(0 0 0 / 0.85);
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: 247 244 236;
+  --bg: 246 244 239;
   --surface: 255 255 255;
-  --surface-2: 240 236 226;
-  --border: 214 207 192;
+  --surface-2: 245 242 235;
+  --surface-3: 236 232 222;
+  --border: 222 216 204;
   --fg: 26 24 20;
   --muted: 92 87 77;       /* AA sobre --bg/--surface */
   --gold-100: 243 216 142;
@@ -48,4 +54,6 @@
   --on-gold: 20 16 8;
   --focus: 140 107 46;
   --chart-1: 170 132 56;   /* validado sobre #FFFFFF */
+  --elev-1: 0 1px 2px rgb(30 24 10 / 0.05), 0 8px 24px -16px rgb(30 24 10 / 0.18);
+  --elev-2: 0 2px 4px rgb(30 24 10 / 0.06), 0 24px 48px -20px rgb(30 24 10 / 0.25);
 }

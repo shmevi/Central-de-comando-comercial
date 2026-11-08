@@ -15,7 +15,7 @@ const session = (email) => ({ access_token: tokenFor(email), token_type: 'bearer
   user: { id: USERS[email].id, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() } });
 
 /** PostgREST em memória: cada linha guarda user_id; o "RLS" filtra pelo usuário do token. */
-const db = {}; const calls = [];
+const db = {}; const calls = []; const storage = new Map();
 function userFromAuth(h) { try { return JSON.parse(Buffer.from(h.split(' ')[1].split('.')[1], 'base64url').toString()).sub; } catch { return null; } }
 async function handle(route) {
   const req = route.request(); const url = new URL(req.url()); const method = req.method();
@@ -29,6 +29,21 @@ async function handle(route) {
   if (url.pathname === '/auth/v1/recover') return json(200, {});
   if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204 });
   if (url.pathname === '/auth/v1/user') return json(200, session('coord@cppem.com.br').user);
+  // Storage simulado (bucket privado "branding"): cada usuário só lê/grava na própria pasta <user_id>/...
+  const st = /^\/storage\/v1\/object\/branding\/?(.*)$/.exec(url.pathname);
+  if (st) {
+    const uidS = userFromAuth(req.headers()['authorization'] || '');
+    if (!uidS) return json(400, { statusCode: '403', error: 'Unauthorized', message: 'JWT required' });
+    const path = decodeURIComponent(st[1]);
+    if (method === 'DELETE') {
+      const { prefixes = [] } = JSON.parse(req.postData() || '{}');
+      const removed = prefixes.filter((x) => x.startsWith(uidS + '/') && storage.delete(x));
+      return json(200, removed.map((name) => ({ name })));
+    }
+    if (!path.startsWith(uidS + '/')) return json(400, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' });
+    if (method === 'POST' || method === 'PUT') { storage.set(path, req.postDataBuffer()); return json(200, { Key: `branding/${path}` }); }
+    if (method === 'GET') { const buf = storage.get(path); return buf ? route.fulfill({ status: 200, contentType: 'image/png', body: buf }) : json(400, { statusCode: '404', error: 'not_found', message: 'Object not found' }); }
+  }
   const m = /^\/rest\/v1\/([a-z_]+)$/.exec(url.pathname);
   if (!m) return json(404, { message: 'not found' });
   const uid = userFromAuth(req.headers()['authorization'] || '');
@@ -90,6 +105,23 @@ async function handle(route) {
   await p.reload(); await p.waitForSelector('text=Tarefa no Supabase', { timeout: 10000 });
   ok((db.tasks || []).some((t) => t.title === 'Tarefa no Supabase'), 'tarefa criada fica no banco e reaparece após recarregar');
 
+  // Logo personalizada no Storage: pasta do usuário, caminho salvo em settings.logo_path, persiste após recarregar
+  await p.goto(BASE + '/configuracoes'); await p.waitForSelector('text=Identidade visual');
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  await p.setInputFiles('input[aria-label="Arquivo da logo"]', { name: 'logo.png', mimeType: 'image/png', buffer: PNG });
+  await p.waitForSelector('text=Logo personalizada em uso.', { timeout: 8000 });
+  const uidA = USERS['coord@cppem.com.br'].id;
+  const logoPath = (db.settings || []).find((x) => x.user_id === uidA)?.logo_path || '';
+  ok(logoPath.startsWith(uidA + '/') && storage.has(logoPath), `logo enviada ao Storage na pasta do usuário (${logoPath})`);
+  await p.reload(); await p.waitForSelector('text=Identidade visual');
+  ok(await p.locator('aside img[alt="Logo da Central"]').waitFor({ timeout: 8000 }).then(() => true, () => false), 'logo baixada do Storage após recarregar (persistência entre sessões)');
+
+  // Conquista do relatório gravada no banco (report_entries) com o user_id do usuário
+  await p.goto(BASE + '/relatorios'); await p.waitForSelector('text=Tarefas concluídas');
+  await p.fill('#entrada-conquista', 'Conquista no Supabase'); await p.click('button[aria-label="Registrar conquista"]');
+  await p.waitForSelector('li:has-text("Conquista no Supabase")');
+  ok((db.report_entries || []).some((e) => e.text === 'Conquista no Supabase' && e.user_id === uidA && e.kind === 'conquista'), 'conquista salva em report_entries no Supabase');
+
   // sessão persiste entre recargas; sair volta para o login
   await p.click('button:has-text("Sair")'); await p.waitForSelector('text=Entre para continuar');
   ok(true, 'sair volta para a tela de login');
@@ -99,6 +131,9 @@ async function handle(route) {
   await p.waitForSelector('text=Missão do dia', { timeout: 10000 });
   await p.goto(BASE + '/tarefas'); await p.waitForTimeout(800);
   ok(await p.locator('text=Tarefa no Supabase').count() === 0, 'segundo usuário não vê tarefas do primeiro');
+  ok(await p.locator('aside img[alt="Logo da Central"]').count() === 0, 'segundo usuário não herda a logo do primeiro');
+  await p.goto(BASE + '/relatorios'); await p.waitForSelector('text=Tarefas concluídas');
+  ok(await p.locator('text=Conquista no Supabase').count() === 0, 'segundo usuário não vê conquistas do primeiro');
 
   // link de recuperação de senha do e-mail → tela "Defina sua senha" → app
   await p.click('button:has-text("Sair")'); await p.waitForSelector('text=Entre para continuar');

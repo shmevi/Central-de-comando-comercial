@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Download, Plus, Trash2, Upload } from 'lucide-react';
+import { Download, ImagePlus, Plus, Trash2, Upload } from 'lucide-react';
 import { actions, useCollection, resetStore } from '@/data/store';
 import { useInstitutions, useSettings } from '@/app/hooks';
 import { useAuth } from '@/app/auth';
@@ -17,9 +17,63 @@ import { fmtDuration, toMin, WEEKDAYS } from '@/lib/time';
 import { uid } from '@/lib/utils';
 import { hashPin } from '@/lib/pin';
 import { download } from '@/features/reports/build';
+import { LOGO_ACCEPT, removeLogoFile, uploadLogo } from '@/data/branding';
+import { BrandLogo, useBrandLogo } from '@/components/layout/BrandLogo';
 
 function Section({ title, children, description }: { title: string; description?: string; children: React.ReactNode }) {
-  return <Card className="p-4"><h2 className="text-lg text-gold">{title}</h2>{description && <p className="mb-3 text-xs text-muted">{description}</p>}<div className="mt-3 space-y-3">{children}</div></Card>;
+  return (
+    <Card className="p-5">
+      <h2 className="font-sans text-base font-semibold tracking-normal">{title}</h2>
+      {description && <p className="mt-1 text-xs text-muted">{description}</p>}
+      <div className="mt-4 space-y-4">{children}</div>
+    </Card>
+  );
+}
+
+/** Logo personalizada da Central (Supabase Storage no modo Supabase; navegador no modo local). */
+function LogoSection() {
+  const { settings, save } = useSettings();
+  const toast = useToast();
+  const { confirm, confirmNode } = useConfirm();
+  const url = useBrandLogo();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = React.useState(false);
+  const current = settings.logo_path ?? null;
+  async function choose(file: File) {
+    setBusy(true);
+    try {
+      const path = await uploadLogo(file);
+      await save({ logo_path: path });
+      if (current && current !== path) await removeLogoFile(current).catch(() => { /* arquivo antigo: não crítico */ });
+      toast('Logo atualizada.');
+    } catch (e) { toast((e as Error).message, 'erro'); } finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!(await confirm({ title: 'Remover logo personalizada', message: 'A Central volta a usar o monograma CP. Continuar?', confirmLabel: 'Remover', danger: true }))) return;
+    setBusy(true);
+    try { await save({ logo_path: null }); await removeLogoFile(current).catch(() => {}); toast('Logo personalizada removida.'); }
+    catch (e) { toast((e as Error).message, 'erro'); } finally { setBusy(false); }
+  }
+  return (
+    <Section title="Identidade visual" description={DATA_MODE === 'supabase' ? 'A logo fica no Supabase Storage (pasta privada da sua conta) e aparece em todos os seus dispositivos.' : 'Modo local: a logo fica salva só neste navegador.'}>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border/70 bg-surface-2" aria-label="Prévia da logo">
+          {url ? <img src={url} alt="Prévia da logo personalizada" className="h-full w-full object-contain" /> : <BrandLogo size={56} />}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-sm">{url ? 'Logo personalizada em uso.' : 'Usando o monograma padrão “CP”.'}</p>
+          <p className="text-xs text-muted">PNG, JPG/JPEG ou WEBP · até {DATA_MODE === 'supabase' ? '2 MB' : '700 KB'} · de preferência quadrada.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => inputRef.current?.click()}><ImagePlus size={14} />{busy ? 'Enviando…' : 'Escolher imagem'}</Button>
+            {current && <Button size="sm" variant="ghost" disabled={busy} onClick={remove}><Trash2 size={14} />Remover logo personalizada</Button>}
+          </div>
+          <input ref={inputRef} type="file" accept={LOGO_ACCEPT} className="hidden" aria-label="Arquivo da logo"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) choose(f); e.target.value = ''; }} />
+        </div>
+      </div>
+      {confirmNode}
+    </Section>
+  );
 }
 
 function Institutions() {
@@ -190,8 +244,9 @@ export default function Configuracoes() {
 
   return (
     <div>
-      <PageHeader title="Configurações" />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <PageHeader title="Configurações" eyebrow="Sistema" />
+      <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+        <LogoSection />
         <Section title="Perfil e aparência">
           <TextField label="Como devo chamar você?" defaultValue={settings.display_name} onBlur={(e) => e.target.value.trim() && save({ display_name: e.target.value.trim() })} />
           <div><span className="label">Tema</span>

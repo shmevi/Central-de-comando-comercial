@@ -164,7 +164,7 @@ export default function Equipes() {
       ) : restricted ? <PinGate onUnlock={() => { unlockedThisSession = true; setUnlocked(true); }} /> : feedbacks.loading ? <Loading /> : fs.length === 0 ? <EmptyState title="Nenhum feedback" action={<Button onClick={() => setNewF('')}><Plus size={16} />Feedback</Button>} /> : (
         <ul className="space-y-2">
           {fs.map((f) => (
-            <li key={f.id}><Card className="p-4">
+            <li key={f.id}><Card className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="font-semibold">{pById[f.person_id]?.name ?? 'Pessoa removida'} {f.is_demo && <DemoBadge />}</div>

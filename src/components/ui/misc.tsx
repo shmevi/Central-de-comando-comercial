@@ -4,22 +4,33 @@ import { cn } from '@/lib/utils';
 import { Button } from './button';
 
 export function Card({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) { return <div className={cn('card', className)} {...p} />; }
+
+/** Cabeçalho de cartão: título neutro (sem excesso de dourado), ícone em pastilha discreta. */
 export function CardHeader({ title, icon, action, subtitle }: { title: string; icon?: React.ReactNode; action?: React.ReactNode; subtitle?: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 px-4 pt-4">
-      <div className="min-w-0">
-        <h2 className="flex items-center gap-2 text-lg text-gold">{icon}{title}</h2>
-        {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+    <div className="flex items-start justify-between gap-3 px-5 pt-5">
+      <div className="flex min-w-0 items-center gap-3">
+        {icon && <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border/70 bg-surface-2 text-gold" aria-hidden>{icon}</span>}
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold normal-case tracking-normal font-sans">{title}</h2>
+          {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+        </div>
       </div>
       {action}
     </div>
   );
 }
 export function Badge({ className, children, color }: { className?: string; children: React.ReactNode; color?: string }) {
-  return <span className={cn('chip border-border text-muted', className)} style={color ? { borderColor: `${color}80`, color, background: `${color}14` } : undefined}>{children}</span>;
+  return <span className={cn('chip border-border/80 text-muted', className)} style={color ? { borderColor: `${color}55`, color, background: `${color}12` } : undefined}>{children}</span>;
 }
 /** Selo discreto de item sincronizado do Notion. */
-export function NotionBadge() { return <span className="chip border-border text-muted" title="Sincronizado do Notion">Notion</span>; }
+export function NotionBadge() {
+  return (
+    <span className="chip border-border/80 bg-surface-2 text-muted" title="Sincronizado do Notion">
+      <span aria-hidden className="grid h-3 w-3 place-items-center rounded-[3px] border border-current text-[8px] font-bold leading-none">N</span>Notion
+    </span>
+  );
+}
 export function DemoBadge() { return <span className="demo-badge" title="Dado fictício para demonstração">Demonstração</span>; }
 
 export function Loading({ label = 'Carregando…' }: { label?: string }) {
@@ -27,7 +38,7 @@ export function Loading({ label = 'Carregando…' }: { label?: string }) {
 }
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div role="alert" className="flex flex-col items-center gap-3 rounded-xl border border-danger/40 bg-danger/5 p-6 text-center text-sm">
+    <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-danger/30 bg-danger/5 p-6 text-center text-sm">
       <AlertTriangle className="text-danger" />
       <p>{message}</p>
       {onRetry && <Button variant="secondary" size="sm" onClick={onRetry}>Tentar novamente</Button>}
@@ -36,44 +47,65 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 }
 export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: React.ReactNode; icon?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border p-8 text-center">
-      <div className="text-muted">{icon ?? <Inbox />}</div>
-      <p className="font-display text-lg uppercase tracking-wide">{title}</p>
+    <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border/80 bg-surface/40 px-6 py-10 text-center">
+      <div className="mb-1 grid h-11 w-11 place-items-center rounded-xl bg-surface-2 text-muted">{icon ?? <Inbox size={20} />}</div>
+      <p className="text-base font-semibold">{title}</p>
       {description && <p className="max-w-md text-sm text-muted">{description}</p>}
-      {action && <div className="mt-2">{action}</div>}
+      {action && <div className="mt-3">{action}</div>}
     </div>
   );
 }
 export function Progress({ value, label, className }: { value: number; label: string; className?: string }) {
   const v = Math.max(0, Math.min(100, value));
   return (
-    <div className={cn('h-2.5 w-full overflow-hidden rounded-full bg-surface-2', className)} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v)}>
-      <div className="h-full rounded-full bg-gold-gradient transition-all" style={{ width: `${v}%` }} />
+    <div className={cn('h-2 w-full overflow-hidden rounded-full bg-surface-3', className)} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v)}>
+      <div className="h-full rounded-full bg-gold-gradient transition-[width] duration-500" style={{ width: `${v}%` }} />
     </div>
   );
 }
-export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string }) {
+/** Abas segmentadas. Selecionado: realce neutro com detalhe dourado (sem bloco dourado). */
+export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number }[]; label: string }) {
   return (
     // flex-wrap + max-w-full: em tela estreita as abas passam para uma segunda linha em vez de estourar a página.
-    // Quando cabem numa linha (desktop), nada muda; gap-y só existe entre linhas quebradas.
-    <div role="radiogroup" aria-label={label} className="inline-flex max-w-full flex-wrap gap-y-1 rounded-xl border border-border bg-surface p-1">
-      {options.map((o) => (
-        <button key={o.value} role="radio" aria-checked={value === o.value} type="button" onClick={() => onChange(o.value)}
-          className={cn('rounded-lg px-3 py-1 font-display text-sm font-bold uppercase tracking-wider', value === o.value ? 'bg-gold-gradient on-gold' : 'text-muted hover:text-fg')}>
-          {o.label}
-        </button>
-      ))}
+    <div role="radiogroup" aria-label={label} className="inline-flex max-w-full flex-wrap gap-0.5 rounded-xl border border-border/70 bg-surface p-1">
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button key={o.value} role="radio" aria-checked={on} type="button" onClick={() => onChange(o.value)}
+            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+              on ? 'bg-surface-3 text-fg shadow-[inset_0_-2px_0_rgb(var(--gold-300))]' : 'text-muted hover:bg-surface-2 hover:text-fg')}>
+            {o.label}
+            {o.count != null && <span className={cn('rounded-full px-1.5 text-[10px] tabular-nums', on ? 'bg-gold-300/15 text-gold' : 'bg-surface-2 text-muted')} aria-label={`${o.count} itens`}>{o.count}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: React.ReactNode; actions?: React.ReactNode }) {
+export function PageHeader({ title, subtitle, actions, eyebrow }: { title: string; subtitle?: React.ReactNode; actions?: React.ReactNode; eyebrow?: string }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-3xl leading-tight sm:text-4xl">{title}</h1>
-        {subtitle && <div className="text-sm text-muted">{subtitle}</div>}
+        {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
+        <h1 className="brand-title text-[28px] leading-none sm:text-[34px]">{title}</h1>
+        {subtitle && <div className="mt-1.5 text-sm text-muted">{subtitle}</div>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+/** Barra de filtros padronizada. */
+export function FilterBar({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('card mb-5 flex flex-col gap-3 p-3 sm:p-4', className)}>{children}</div>;
+}
+/** Indicador numérico (KPI). */
+export function Stat({ label, value, icon, tone = 'neutral', hint }: { label: string; value: React.ReactNode; icon?: React.ReactNode; tone?: 'neutral' | 'gold' | 'danger' | 'orange' | 'success'; hint?: string }) {
+  const toneCls = { neutral: 'text-fg', gold: 'text-gold', danger: 'text-danger', orange: 'text-orange', success: 'text-success' }[tone];
+  return (
+    <div className="card p-4">
+      <div className="flex items-center justify-between text-xs font-medium text-muted">{label}<span className={cn('opacity-80', toneCls)} aria-hidden>{icon}</span></div>
+      <div className={cn('mt-2 font-display text-[34px] font-bold leading-none tabular-nums', toneCls)}>{value}</div>
+      {hint && <p className="mt-1 text-[11px] text-muted">{hint}</p>}
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { effectiveMinutes, workdayStatus, workedMinutes, hitsBreak } from './wor
 import { fmtDate, parseBRDate, startOfWeek, addDays, fmtDuration } from './time';
 import { findConflicts } from './conflicts';
 import { krProgress, objectiveProgress } from './okr';
-import { buildWhatsAppInvite } from './whatsapp';
 
 describe('jornada', () => {
   it('carga efetiva = 528 min (8h48)', () => {
@@ -63,13 +62,6 @@ describe('OKR', () => {
   });
 });
 
-describe('WhatsApp', () => {
-  it('não inventa horário quando não confirmado', () => {
-    const msg = buildWhatsAppInvite({ name: 'Fulano', position: 'Consultor', institution: 'CPPEM', date: '2026-11-06', start: '14:00', confirmed: false, location: '' });
-    expect(msg).toContain('a confirmar');
-    expect(msg).not.toContain('14:00');
-  });
-});
 
 import { validateWorkday } from './workday';
 import { safeHttpUrl } from './utils';

@@ -89,7 +89,7 @@ export default function Treinamentos() {
             const present = t.attendees.filter((a) => a.present).length;
             const scores = t.attendees.map((a) => a.score).filter((s): s is number => s != null);
             return (
-              <li key={t.id}><Card className="p-4">
+              <li key={t.id}><Card className="p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div><div className="font-semibold">{t.title} {t.is_demo && <DemoBadge />}</div>
                     <div className="flex flex-wrap gap-1 text-xs text-muted"><span className="chip border-gold-300/50 text-gold">{TRACKS.find((x) => x.value === t.track)?.label}</span><InstitutionBadge id={t.institution_id} />{fmtDate(t.date)} · {t.duration_min} min</div></div>

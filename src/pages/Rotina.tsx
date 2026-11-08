@@ -94,7 +94,7 @@ function DayView({ date, workday, nowTime, isToday }: { date: string; workday: W
   if (!ready) return <Loading />;
   return (
     <div className="space-y-4">
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm">Concluído: <strong className="text-gold">{fmtDuration(doneMin)}</strong> de {fmtDuration(planMin)} planejados</div>
           <div className="flex gap-2">
@@ -162,7 +162,7 @@ function WeekView({ date, onPick }: { date: string; onPick: (d: string) => void 
           return (
             <section key={d} className="card p-3" aria-label={fmtDate(d)}>
               <button type="button" onClick={() => onPick(d)} className="mb-2 w-full text-left">
-                <h2 className="text-base text-gold">{WEEKDAYS_SHORT[weekdayOf(d)]} {fmtDate(d).slice(0, 5)}</h2>
+                <h2 className="font-sans text-sm font-semibold tracking-normal">{WEEKDAYS_SHORT[weekdayOf(d)]} {fmtDate(d).slice(0, 5)}</h2>
                 <p className="text-xs text-muted">{list.length ? `${done}/${list.filter((b) => !b.is_break).length} concluídos` : 'Não gerada'}</p>
               </button>
               {list.length === 0 ? <Button size="sm" variant="secondary" className="w-full" onClick={() => materializeDay(d, templates.items)}>Gerar</Button> : (

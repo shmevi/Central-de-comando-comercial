@@ -11,6 +11,7 @@ import '@fontsource/barlow-condensed/latin-600.css';
 import '@fontsource/barlow-condensed/latin-700.css';
 import '@fontsource/barlow-condensed/latin-800.css';
 import './styles/index.css';
+import './styles/brand-font';
 
 try {
   const t = JSON.parse(localStorage.getItem('ccc:v1:settings') ?? '[]')[0]?.theme;

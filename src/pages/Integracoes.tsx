@@ -85,7 +85,7 @@ function NotionConfigForm({ cfg, onSave, demo }: { cfg: NotionConfig; onSave: (c
   }
   return (
     <Card className="space-y-3 p-4 text-sm">
-      <h2 className="text-lg text-gold">Responsável e bases</h2>
+      <h2 className="font-sans text-base font-semibold tracking-normal">Responsável e bases</h2>
       <TextField label="Nome do responsável (só exibição)" value={d.person_name} onChange={(e) => setD({ ...d, person_name: e.target.value })} />
       {REQUIRED_NOTION_FIELDS.map(([k, label]) => (
         <TextField key={k} label={label} required value={String(d[k] ?? '')} error={err(k)} spellCheck={false} autoComplete="off"
@@ -154,7 +154,7 @@ export default function Integracoes() {
       {tab === 'conexao' && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="space-y-4 p-4">
-            <div className="flex items-center gap-3"><Plug className="text-gold" /><div><h2 className="text-lg">Notion</h2><p className="text-xs text-muted">Adaptador: {adapter.kind === 'mock' ? 'Demonstração (mock)' : adapter.kind.toUpperCase()}</p></div>
+            <div className="flex items-center gap-3"><Plug className="text-gold" /><div><h2 className="font-sans text-base font-semibold tracking-normal">Notion</h2><p className="text-xs text-muted">Adaptador: {adapter.kind === 'mock' ? 'Demonstração (mock)' : adapter.kind.toUpperCase()}</p></div>
               <span className={cn('chip ml-auto', settings.notion_enabled ? 'border-success/60 text-success' : 'border-border text-muted')}>{settings.notion_enabled ? <><CheckCircle2 size={12} />Leitura ativa</> : <><XCircle size={12} />Desativado</>}</span></div>
             <Checkbox label="Ativar leitura (tarefas e OKRs)" checked={settings.notion_enabled} onChange={toggleEnabled} />
             <div className="rounded-lg border border-border p-3">
@@ -167,8 +167,8 @@ export default function Integracoes() {
             <Button onClick={runSync} disabled={!settings.notion_enabled || syncing || !cfgCheck.ok}><RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />{syncing ? 'Lendo…' : 'Sincronizar (somente leitura)'}</Button>
             <p className="text-xs text-muted">Última leitura: {cfg.last_sync_at ? fmtDateTime(cfg.last_sync_at) : 'nunca'}</p>
           </Card>
-          <Card className="p-4 text-sm">
-            <h2 className="mb-2 text-lg text-gold">Como funciona</h2>
+          <Card className="p-5 text-sm">
+            <h2 className="mb-3 font-sans text-base font-semibold tracking-normal">Como funciona</h2>
             <ol className="list-decimal space-y-1 pl-5 text-muted">
               <li>Só entram Tarefas e KRs cujo responsável é <strong>{who}</strong>, conferido pelo ID do usuário no Notion — na consulta e de novo antes de gravar.</li>
               <li>Itens de outras pessoas ou sem responsável são ignorados: não entram, não vão para revisão e não aparecem no log.</li>
@@ -188,7 +188,7 @@ export default function Integracoes() {
             <p className="px-1 text-xs text-muted">Status lidos: {ACTIVE_STATUS_GROUPS.map((g) => (g === 'to_do' ? 'a fazer' : 'em andamento')).join(' e ')}. Os nomes das propriedades abaixo são fixos para que um nome errado não possa ser digitado.</p>
           </div>
           <Card className="space-y-2 p-4 text-sm">
-            <h2 className="text-lg text-gold">Tarefas</h2>
+            <h2 className="font-sans text-base font-semibold tracking-normal">Tarefas</h2>
             <ul className="space-y-1 text-muted">
               <li>Título ← <code>{PROPS.tarefas.title}</code></li><li>Status ← <code>{PROPS.tarefas.status}</code></li>
               <li>Prioridade ← <code>{PROPS.tarefas.priority}</code></li><li>Prazo ← <code>{PROPS.tarefas.due_date}</code> (início)</li>
@@ -200,7 +200,7 @@ export default function Integracoes() {
             <ul className="text-xs text-muted">{Object.entries(TASK_PRIORITY_MAP).map(([n, c]) => <li key={n}>{n} → {PRIORITY[c].label}</li>)}</ul>
           </Card>
           <Card className="space-y-2 p-4 text-sm">
-            <h2 className="text-lg text-gold">OKRs</h2>
+            <h2 className="font-sans text-base font-semibold tracking-normal">OKRs</h2>
             <ul className="space-y-1 text-muted">
               <li>Objetivo ← <code>{PROPS.krs.objective}</code> → <code>{PROPS.objetivos.title}</code> (somente leitura)</li>
               <li>KR ← <code>{PROPS.krs.title}</code></li><li>Meta ← <code>{PROPS.krs.target}</code> · Atual ← <code>{PROPS.krs.current}</code></li>
