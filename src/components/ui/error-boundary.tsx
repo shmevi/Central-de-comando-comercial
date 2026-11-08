@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { ErrorState } from './misc';
+import { isChunkError } from '@/app/staleBuild';
 
 /** Impede que um erro em uma tela derrube o app inteiro (tela em branco). */
 export class ErrorBoundary extends React.Component<{ children: React.ReactNode; resetKey?: string }, { error: Error | null }> {
@@ -8,6 +9,8 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode; 
   componentDidCatch(error: Error, info: React.ErrorInfo) { console.error('Erro na tela:', error, info.componentStack); }
   componentDidUpdate(prev: { resetKey?: string }) { if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null }); }
   render() {
+    if (this.state.error && isChunkError(this.state.error))
+      return <ErrorState message="Saiu uma versão nova da Central. Atualize a página para continuar." retryLabel="Atualizar" onRetry={() => window.location.reload()} />;
     if (this.state.error) return <ErrorState message={`Algo deu errado nesta tela: ${this.state.error.message}`} onRetry={() => this.setState({ error: null })} />;
     return this.props.children;
   }

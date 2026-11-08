@@ -1,26 +1,27 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/app/auth';
 import { ScopeProvider } from '@/app/scope';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppShell } from '@/components/layout/AppShell';
 import { PAGE_LOADERS } from '@/app/routes';
+import { lazyPage } from '@/app/staleBuild';
 import { ErrorState, Loading } from '@/components/ui/misc';
 import Hoje from '@/pages/Hoje';
 import Login, { ConfigError, SetPassword } from '@/pages/Login';
 
-const Rotina = lazy(PAGE_LOADERS['/rotina']);
-const Agenda = lazy(PAGE_LOADERS['/agenda']);
-const Tarefas = lazy(PAGE_LOADERS['/tarefas']);
-const Equipes = lazy(PAGE_LOADERS['/equipes']);
-const EquipePessoa = lazy(PAGE_LOADERS['/equipes/:personId']);
-const Treinamentos = lazy(PAGE_LOADERS['/treinamentos']);
-const Reunioes = lazy(PAGE_LOADERS['/reunioes']);
-const Okrs = lazy(PAGE_LOADERS['/okrs']);
-const Projetos = lazy(PAGE_LOADERS['/projetos']);
-const Relatorios = lazy(PAGE_LOADERS['/relatorios']);
-const Integracoes = lazy(PAGE_LOADERS['/integracoes']);
-const Configuracoes = lazy(PAGE_LOADERS['/configuracoes']);
+const Rotina = lazyPage(PAGE_LOADERS['/rotina']);
+const Agenda = lazyPage(PAGE_LOADERS['/agenda']);
+const Tarefas = lazyPage(PAGE_LOADERS['/tarefas']);
+const Equipes = lazyPage(PAGE_LOADERS['/equipes']);
+const EquipePessoa = lazyPage(PAGE_LOADERS['/equipes/:personId']);
+const Treinamentos = lazyPage(PAGE_LOADERS['/treinamentos']);
+const Reunioes = lazyPage(PAGE_LOADERS['/reunioes']);
+const Okrs = lazyPage(PAGE_LOADERS['/okrs']);
+const Projetos = lazyPage(PAGE_LOADERS['/projetos']);
+const Relatorios = lazyPage(PAGE_LOADERS['/relatorios']);
+const Integracoes = lazyPage(PAGE_LOADERS['/integracoes']);
+const Configuracoes = lazyPage(PAGE_LOADERS['/configuracoes']);
 
 function NotFound() { return <ErrorState message="Página não encontrada." />; }
 

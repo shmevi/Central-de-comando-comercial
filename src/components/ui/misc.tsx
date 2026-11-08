@@ -36,12 +36,12 @@ export function DemoBadge() { return <span className="demo-badge" title="Dado fi
 export function Loading({ label = 'Carregando…' }: { label?: string }) {
   return <div role="status" className="flex items-center justify-center gap-2 p-8 text-sm text-muted"><Loader2 className="animate-spin" size={18} />{label}</div>;
 }
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({ message, onRetry, retryLabel = 'Tentar novamente' }: { message: string; onRetry?: () => void; retryLabel?: string }) {
   return (
     <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-danger/30 bg-danger/5 p-6 text-center text-sm">
       <AlertTriangle className="text-danger" />
       <p>{message}</p>
-      {onRetry && <Button variant="secondary" size="sm" onClick={onRetry}>Tentar novamente</Button>}
+      {onRetry && <Button variant="secondary" size="sm" onClick={onRetry}>{retryLabel}</Button>}
     </div>
   );
 }
