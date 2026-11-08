@@ -296,6 +296,17 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   const m = JSON.parse(am.data || '{}');
   ok(am.url.startsWith('blob:') && !(am.errors || []).length && (m.icons || []).length === 3 && m.icons.every((i) => i.src.startsWith('data:image/png')) && m.name === 'Central de Comando Comercial' && m.display === 'standalone' && m.start_url === BASE.replace(/\/$/, '') + '/',
     `manifesto do atalho (Android) com os ícones da logo${(am.errors || []).length ? ` — erros: ${JSON.stringify(am.errors)}` : ''}`);
+  // Logo grande é reduzida (≤512 px, WebP) antes de salvar — deixa a abertura do app leve
+  {
+    const big = await b.newPage(); await big.setViewportSize({ width: 1200, height: 1200 });
+    await big.setContent('<div style="width:1200px;height:1200px;background:linear-gradient(135deg,#d4af5a,#0b0b0d 60%,#e9852b)"></div>');
+    const bigPng = await big.screenshot(); await big.close();
+    await p.setInputFiles('input[aria-label="Arquivo da logo"]', { name: 'grande.png', mimeType: 'image/png', buffer: bigPng });
+    await p.waitForFunction(() => /^data:image\/webp/.test(JSON.parse(localStorage.getItem('ccc:v1:settings') || '[]')[0]?.logo_path || ''), null, { timeout: 8000 }).catch(() => {});
+    const saved = await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:settings') || '[]')[0]?.logo_path || '');
+    const dims = await p.evaluate((u) => new Promise((r) => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.onerror = () => r([0, 0]); i.src = u; }), saved);
+    ok(saved.startsWith('data:image/webp') && dims[0] <= 512 && dims[1] <= 512 && saved.length < bigPng.length * 1.37, `logo grande salva otimizada (${dims.join('×')}, ${Math.round(saved.length / 1024)} KB em vez de ${Math.round(bigPng.length / 1024)} KB)`);
+  }
   await p.setInputFiles('input[aria-label="Arquivo da logo"]', { name: 'falsa.png', mimeType: 'image/png', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>') });
   ok(await p.locator('text=Formato não aceito').waitFor({ timeout: 3000 }).then(() => true, () => false), 'SVG disfarçado de PNG é recusado');
   await p.click('button:has-text("Remover logo personalizada")'); await p.click('role=dialog >> button:has-text("Remover")');

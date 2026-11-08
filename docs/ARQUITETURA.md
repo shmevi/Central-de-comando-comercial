@@ -22,6 +22,25 @@
 - **Componentes compartilhados** (`src/components/ui`): `KanbanBoard` (Tarefas),
   `useDraft` (estado dos formulários), `SearchInput`, `DateNav`, `useConfirm().confirmDelete`, `ErrorBoundary`.
 
+## Desempenho
+
+- **Store** (`src/data/store.ts`): cada coleção é carregada uma vez; pedidos repetidos ao mesmo tempo viram um só
+  (`inflight`), respostas de uma sessão anterior são descartadas (`generation`). `update` e `remove` são **otimistas**:
+  a tela muda na hora e volta ao estado anterior se o servidor recusar.
+- **Abertura**: `prefetch(HOME_DATA)` (`src/data/prefetch.ts`) pede os dados da tela inicial em paralelo enquanto o
+  `ensureSeed` confere a primeira execução — uma única "onda" de pedidos.
+- **Rotas**: páginas em `React.lazy` (`src/app/routes.ts`). Passar o mouse, focar ou tocar num item do menu já baixa o
+  código e os dados daquela tela (`prefetchRoute`); depois de ~1,5 s ocioso as telas leves são baixadas em segundo plano
+  (`prefetchIdle`, desligado em economia de dados/2G). Telas com gráficos (Relatórios, pessoa) só sob demanda.
+- **Supabase** (`src/data/supabaseRepository.ts`): a 1ª página traz a contagem (`count: 'exact'`) e as demais páginas
+  (500 linhas) vêm em paralelo; sem contagem, cai na paginação sequencial. `RECENT_LIMIT` (`sync_logs`: 300 mais
+  recentes) evita carregar o log inteiro — a exportação usa `list({ all: true })`. `createMany` grava em lotes de 200.
+- **Notion**: a sincronização grava em lote (`createMany`) e atualiza com concorrência limitada (`pool`, 6); o envio
+  processa até 4 itens em paralelo e grava o progresso uma vez por objetivo.
+- **Logo** (`src/data/branding.ts`): o upload é reduzido para no máximo 512 px em WebP; uma logo antiga pesada é
+  otimizada uma vez em segundo plano (a original fica no Storage). A imagem fica em cache no navegador
+  (`ccc:logo-cache:<caminho>`), então não é baixada a cada abertura; o ícone do atalho é gerado quando o navegador está ocioso.
+
 ## Stack
 
 React 18 + TypeScript + Vite · Tailwind CSS · componentes no padrão shadcn/ui (Radix Dialog/Slot + CVA) ·

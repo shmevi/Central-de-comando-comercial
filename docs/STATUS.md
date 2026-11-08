@@ -36,6 +36,10 @@
 - **Quadros iguais aos do Notion**: OKRs em "Kanban por Objetivo" (colunas = Objetivos, só KRs ativos, status no cartão)
   e Tarefas agrupadas por ATRIBUIÇÃO (70% / 20% / 10% / OFF WORK, só ativas) ou por status com os nomes do Notion.
 
+- **Desempenho**: abertura em uma onda de pedidos, telas pré-carregadas ao passar o mouse/tocar no menu, ações com
+  resposta imediata (e desfeitas se o servidor recusar), logo otimizada e em cache, sincronização do Notion em lote.
+  Detalhes em `ARQUITETURA.md` → "Desempenho".
+
 ## Demonstração (fictício, sempre identificado)
 - **Integração Notion no modo local**: a mesma lógica roda sobre um adaptador *mock*; itens recebem o selo "Demonstração".
   No modo Supabase a leitura é **real** (ver "Funcional").
@@ -54,5 +58,6 @@
 - Arrastar e soltar nos Kanbans usa HTML5 drag (desktop); no celular e por teclado use o seletor "Mover".
 - Notion: criar páginas novas (tarefa ou KR criados na Central) e mudar o Objetivo de um KR ainda não são enviados.
   A fórmula `Progresso` só é convertida para 0–100 quando confere com Meta/Atual; senão o progresso é calculado na Central.
+- O log de sincronização mostra os 300 registros mais recentes (a exportação em Configurações leva todos).
 - Os arquivos anexos citados no pedido (`prompt-central-comando-comercial.md` e `0001_central_comando.sql`) não
   estavam no repositório; o esquema foi escrito a partir do texto do pedido. Se houver diferenças, posso conciliar.

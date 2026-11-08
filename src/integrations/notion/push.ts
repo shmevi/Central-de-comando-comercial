@@ -6,11 +6,11 @@
  *    na Central: estado de sincronização, conflitos (fila de revisão) e log com direção "escrita".
  * Nada é enviado sem a confirmação da tela, e o servidor recusa tudo se a escrita não estiver autorizada.
  */
-import { actions } from '@/data/store';
+import { actions, getItems } from '@/data/store';
 import type { KeyResult, NotionConfig, NotionSyncState, Objective, Task } from '@/domain/types';
 import { PRIORITY, TASK_STATUS } from '@/domain/labels';
 import { fmtDate } from '@/lib/time';
-import { nowIso } from '@/lib/utils';
+import { nowIso, pool } from '@/lib/utils';
 import { normalizePageId, sortAttribution } from './config';
 import { stateHash } from './hash';
 import { mapKr, mapTask } from './mapping';
@@ -99,26 +99,28 @@ export async function pushToNotion(writer: NotionWriter, pending: PendingChange[
   if (!pending.length) return sum;
   const results = await writer.push(pending.map((p) => ({ entity: p.entity, page_id: p.page_id, fields: p.fields, base: p.base })), config);
   const now = nowIso();
-  for (const p of pending) {
+  /** Progresso (fórmula) recalculado pelo Notion, juntado por objetivo e gravado uma vez no fim (KRs do mesmo objetivo não se sobrescrevem). */
+  const progress = new Map<string, Map<string, number | null>>();
+  // Cada item é independente: até 4 em paralelo (antes, um por vez).
+  await pool(pending, 4, async (p) => {
     const res = results.find((r) => normalizePageId(r.page_id) === p.page_id && r.entity === p.entity);
     const log = (status: 'sucesso' | 'erro' | 'revisao', message: string, fields: string[] | null) =>
       actions.create('sync_logs', { source: 'notion', direction: 'escrita', entity: p.entity, external_id: p.page_id, fields_changed: fields, status, message, is_demo_source: writer.isDemo });
-    if (!res) { sum.erros++; await log('erro', `Sem resposta do Notion para: ${p.title}`, null); continue; }
+    if (!res) { sum.erros++; await log('erro', `Sem resposta do Notion para: ${p.title}`, null); return; }
     if ((res.status === 'enviado' || res.status === 'sem_mudanca') && res.page) {
-      const { snap, progress } = snapshotOf(p.entity, res.page, { ...p.base, ...p.fields });
+      const { snap, progress: kp } = snapshotOf(p.entity, res.page, { ...p.base, ...p.fields });
       await actions.update('notion_sync_state', p.state.id, {
         synced_hash: await stateHash(snap), synced_snapshot: snap, sync_status: same(pick(snap, PUSH_FIELDS[p.entity]), pick(p.central, PUSH_FIELDS[p.entity])) ? 'ok' : 'pendente_push',
         last_notion_edited_time: res.page.last_edited_time, echo_edited_time: res.page.last_edited_time,
         last_change_origin: 'central', last_synced_at: now,
       });
-      if (p.entity === 'krs' && progress !== undefined) { // progresso (fórmula) recalculado pelo Notion
-        const o = objectives.find((x) => x.id === p.local_parent_id);
-        if (o && o.key_results.some((k) => k.id === p.local_id && k.notion_progress !== progress))
-          await actions.update('objectives', o.id, { key_results: o.key_results.map((k) => (k.id === p.local_id ? { ...k, notion_progress: progress } : k)) });
+      if (p.entity === 'krs' && kp !== undefined && p.local_parent_id) {
+        if (!progress.has(p.local_parent_id)) progress.set(p.local_parent_id, new Map());
+        progress.get(p.local_parent_id)!.set(p.local_id, kp);
       }
       if (res.status === 'enviado') { sum.enviados++; await log('sucesso', `Enviado ao Notion: ${p.title}`, res.written ?? Object.keys(p.fields)); }
       else sum.sem_mudanca++;
-      continue;
+      return;
     }
     if (res.status === 'conflito' && res.page) {
       sum.conflitos++;
@@ -132,12 +134,17 @@ export async function pushToNotion(writer: NotionWriter, pending: PendingChange[
         resolved: false, resolution: null, is_demo: writer.isDemo,
       });
       await log('revisao', `Conflito ao enviar (nada sobrescrito): ${p.title}`, fields);
-      continue;
+      return;
     }
     if (res.status === 'recusado') sum.recusados++; else sum.erros++;
     const msg = `${p.title}: ${res.message ?? 'não enviado'}`;
     if (!sum.mensagens.includes(res.message ?? '')) sum.mensagens.push(res.message ?? '');
     await log('erro', `Não enviado — ${msg}`, Object.keys(p.fields));
+  });
+  for (const [oid, krs] of progress) { // uma gravação por objetivo, a partir do estado mais recente
+    const o = (getItems('objectives') as Objective[]).find((x) => x.id === oid) ?? objectives.find((x) => x.id === oid);
+    if (o && o.key_results.some((k) => krs.has(k.id) && k.notion_progress !== krs.get(k.id)))
+      await actions.update('objectives', o.id, { key_results: o.key_results.map((k) => (krs.has(k.id) ? { ...k, notion_progress: krs.get(k.id)! } : k)) });
   }
   sum.mensagens = sum.mensagens.filter(Boolean);
   return sum;

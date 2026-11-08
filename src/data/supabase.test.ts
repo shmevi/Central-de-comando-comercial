@@ -6,7 +6,7 @@ import { resolveDataConfig } from './config';
 type Call = { method: string; url: URL; body: any };
 
 /** Servidor PostgREST falso: guarda as chamadas e responde como o Supabase. */
-function fakeClient(rows: any[], fail?: { status: number; code: string; message: string }) {
+function fakeClient(rows: any[], fail?: { status: number; code: string; message: string }, withCount = true) {
   const calls: Call[] = [];
   const fetchFn = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -16,10 +16,15 @@ function fakeClient(rows: any[], fail?: { status: number; code: string; message:
     if (fail) return new Response(JSON.stringify({ code: fail.code, message: fail.message, details: null, hint: null }), { status: fail.status, headers: { 'content-type': 'application/json' } });
     if (method === 'GET') {
       const offset = Number(url.searchParams.get('offset') ?? 0), limit = Number(url.searchParams.get('limit') ?? rows.length);
-      return new Response(JSON.stringify(rows.slice(offset, offset + limit)), { status: 200, headers: { 'content-type': 'application/json' } });
+      const page = rows.slice(offset, offset + limit);
+      // Como o PostgREST: com Prefer count=exact, o total vem no Content-Range
+      const wantsCount = /count=exact/.test(String((init?.headers as Record<string, string> | undefined)?.Prefer ?? new Headers(init?.headers).get('Prefer') ?? ''));
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (wantsCount && withCount) headers['content-range'] = `${offset}-${offset + page.length - 1}/${rows.length}`;
+      return new Response(JSON.stringify(page), { status: 200, headers });
     }
-    const echo = { id: 'novo', created_at: 'x', updated_at: 'x', user_id: 'do-banco', ...(Array.isArray(body) ? body[0] : body) };
-    return new Response(JSON.stringify(echo), { status: 201, headers: { 'content-type': 'application/json' } });
+    const echo = (b: any) => ({ id: 'novo', created_at: 'x', updated_at: 'x', user_id: 'do-banco', ...b });
+    return new Response(JSON.stringify(Array.isArray(body) ? body.map(echo) : echo(body)), { status: 201, headers: { 'content-type': 'application/json' } });
   };
   const client = createClient('https://projeto.supabase.co', 'sb_publishable_teste', { global: { fetch: fetchFn as typeof fetch }, auth: { persistSession: false } });
   return { client, calls };
@@ -33,6 +38,35 @@ describe('SupabaseRepository', () => {
     expect(list).toHaveLength(1200);
     expect(calls.map((c) => c.url.searchParams.get('offset'))).toEqual(['0', String(PAGE_SIZE), String(PAGE_SIZE * 2)]);
     expect(calls[0].url.pathname).toBe('/rest/v1/routine_blocks');
+  });
+  it('com o total informado, as páginas seguintes são pedidas em paralelo', async () => {
+    const rows = Array.from({ length: 1700 }, (_, i) => ({ id: String(i), created_at: '', updated_at: '' }));
+    const { client, calls } = fakeClient(rows);
+    const list = await new SupabaseRepository('routine_blocks', () => client).list();
+    expect(list.map((r) => r.id)).toEqual(rows.map((r) => r.id)); // ordem preservada
+    expect(calls).toHaveLength(4);
+  });
+  it('sem o total (servidor antigo), continua lendo página por página', async () => {
+    const rows = Array.from({ length: 1200 }, (_, i) => ({ id: String(i), created_at: '', updated_at: '' }));
+    const { client } = fakeClient(rows, undefined, false);
+    expect(await new SupabaseRepository('tasks', () => client).list()).toHaveLength(1200);
+  });
+  it('log de sincronização: só os registros mais recentes (backup leva tudo)', async () => {
+    const rows = Array.from({ length: 900 }, (_, i) => ({ id: String(i), created_at: '', updated_at: '' }));
+    const { client, calls } = fakeClient(rows);
+    const r = new SupabaseRepository('sync_logs', () => client);
+    await r.list();
+    expect(calls[0].url.searchParams.get('limit')).toBe('300');
+    expect(calls[0].url.searchParams.get('order')).toBe('created_at.desc,id.desc');
+    expect(await r.list({ all: true })).toHaveLength(900);
+  });
+  it('criação em lote: uma requisição, com default do banco para campos ausentes', async () => {
+    const { client, calls } = fakeClient([]);
+    await new SupabaseRepository('sync_logs', () => client).createMany([{ message: 'a' }, { message: 'b' }] as any);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].body).toHaveLength(2);
+    expect(calls[0].url.searchParams.get('columns')).toBeTruthy(); // supabase-js manda as colunas → ausentes usam DEFAULT
   });
   it('nunca envia user_id, created_at ou updated_at (o banco controla)', async () => {
     const { client, calls } = fakeClient([]);

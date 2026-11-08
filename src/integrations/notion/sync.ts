@@ -6,7 +6,7 @@
 import { actions } from '@/data/store';
 import { repo } from '@/data';
 import type { KeyResult, NotionConfig, NotionSyncState, Objective, ReviewQueueItem, Settings, Task } from '@/domain/types';
-import { nowIso, uid } from '@/lib/utils';
+import { mergeById, nowIso, pool, uid } from '@/lib/utils';
 import type { NotionAdapter } from './adapter';
 import { checkNotionConfig, describeConfigProblem, isNotionId, normalizePageId, resolveNotionConfig } from './config';
 import { readNotion, type NotionRead } from './pipeline';
@@ -66,43 +66,44 @@ export async function syncNotion(source: NotionAdapter | NotionReader, settings:
   }
 }
 
+/**
+ * Grava o plano na Central. Criações vão EM LOTE (1 requisição por tipo) e alterações em paralelo (até 6 ao
+ * mesmo tempo) — antes era uma requisição por vez (dezenas de idas e voltas numa sincronização).
+ * Várias alterações do mesmo registro são juntadas numa só, para respostas fora de ordem não se sobrescreverem.
+ */
 async function applyPlan(plan: SyncPlan, states: NotionSyncState[], isDemo: boolean) {
-  for (const t of plan.taskCreates) await actions.create('tasks', t);
-  for (const u of plan.taskUpdates) await actions.update('tasks', u.id, u.patch);
-  for (const o of plan.objectiveCreates) await actions.create('objectives', o);
-  for (const u of plan.objectiveUpdates) await actions.update('objectives', u.id, u.patch);
+  await Promise.all([actions.createMany('tasks', plan.taskCreates), actions.createMany('objectives', plan.objectiveCreates)]);
+  await Promise.all([
+    pool(mergeById(plan.taskUpdates), 6, (u) => actions.update('tasks', u.id, u.patch)),
+    pool(mergeById(plan.objectiveUpdates), 6, (u) => actions.update('objectives', u.id, u.patch)),
+  ]);
   await upsertStates(plan.states, states, isDemo);
-  for (const r of plan.reviews) await actions.create('review_queue', r);
-  for (const l of plan.logs) {
-    await actions.create('sync_logs', {
-      source: 'notion', direction: 'leitura', entity: l.entity, external_id: l.external_id, fields_changed: l.fields_changed, is_demo_source: isDemo,
-      status: l.action === 'conflito' || l.action === 'revisao' || l.action === 'suspenso' ? 'revisao' : 'sucesso',
-      message: LOG_TEXT[l.action],
-    });
-  }
+  await actions.createMany('review_queue', plan.reviews);
   const c = plan.counts;
-  await actions.create('sync_logs', {
+  await actions.createMany('sync_logs', [...plan.logs.map((l) => ({
+    source: 'notion', direction: 'leitura', entity: l.entity, external_id: l.external_id, fields_changed: l.fields_changed, is_demo_source: isDemo,
+    status: l.action === 'conflito' || l.action === 'revisao' || l.action === 'suspenso' ? 'revisao' : 'sucesso',
+    message: LOG_TEXT[l.action],
+  })), {
     source: 'notion', direction: 'leitura', entity: 'geral', is_demo_source: isDemo, external_id: null, fields_changed: null,
     status: c.tarefas.revisao + c.krs.revisao + c.tarefas.conflitos + c.krs.conflitos ? 'revisao' : 'sucesso',
     message: `Tarefas: ${c.tarefas.criados} nova(s), ${c.tarefas.atualizados} atualizada(s), ${c.tarefas.revisao} em revisão, ${c.tarefas.conflitos} conflito(s), ${c.tarefas.pendente_push} alterada(s) só na Central. `
       + `KRs: ${c.krs.criados} novo(s), ${c.krs.atualizados} atualizado(s), ${c.krs.revisao} em revisão, ${c.krs.conflitos} conflito(s). `
       + `Objetivos: ${c.objetivos.criados} novo(s). Ignorados (outros responsáveis ou sem responsável): ${c.fora_do_escopo}.`,
-  });
+  }]);
 }
 
 const LOG_TEXT = { criado: 'Importado do Notion', atualizado: 'Atualizado pelo Notion', conflito: 'Conflito: alterado nos dois lados — enviado para revisão', revisao: 'Enviado para revisão', suspenso: 'Sincronização do item suspensa (muitas escritas seguidas)' } as const;
 
 async function upsertStates(patches: StatePatch[], current: NotionSyncState[], isDemo = false) {
   const byPage = new Map(current.map((s) => [normalizePageId(s.notion_page_id), s]));
-  for (const p of patches) {
-    const ex = byPage.get(p.notion_page_id);
-    if (ex) await actions.update('notion_sync_state', ex.id, p);
-    else await actions.create('notion_sync_state', {
-      local_id: null, local_parent_id: null, notion_parent_id: null, pinned_parent_id: null, synced_hash: null, synced_snapshot: null,
-      last_notion_edited_time: null, last_central_updated_at: null, last_synced_at: null, last_change_origin: null, echo_edited_time: null,
-      sync_status: 'ok', write_count_window: 0, write_window_started_at: null, is_demo: isDemo, ...p,
-    });
-  }
+  const updates = patches.filter((p) => byPage.has(p.notion_page_id)).map((p) => ({ id: byPage.get(p.notion_page_id)!.id, patch: p }));
+  const creates = patches.filter((p) => !byPage.has(p.notion_page_id)).map((p) => ({
+    local_id: null, local_parent_id: null, notion_parent_id: null, pinned_parent_id: null, synced_hash: null, synced_snapshot: null,
+    last_notion_edited_time: null, last_central_updated_at: null, last_synced_at: null, last_change_origin: null, echo_edited_time: null,
+    sync_status: 'ok', write_count_window: 0, write_window_started_at: null, is_demo: isDemo, ...p,
+  }));
+  await Promise.all([actions.createMany('notion_sync_state', creates), pool(mergeById(updates), 6, (u) => actions.update('notion_sync_state', u.id, u.patch))]);
 }
 
 // ======================================================================== resolução da fila

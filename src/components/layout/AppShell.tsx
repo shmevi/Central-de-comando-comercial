@@ -3,6 +3,10 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight, HardDrive, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
 import { NAV, NAV_GROUPS, MOBILE_TABS, type NavGroup } from '@/app/nav';
 import { BrandLogo, useAppIcon } from './BrandLogo';
+import { prefetchIdle, prefetchRoute } from '@/app/routes';
+
+/** Pré-carrega código e dados da tela quando a pessoa aponta para o link (antes do clique). */
+const intent = (to: string) => ({ onMouseEnter: () => prefetchRoute(to), onFocus: () => prefetchRoute(to), onTouchStart: () => prefetchRoute(to) });
 import { cn } from '@/lib/utils';
 import { useScope } from '@/app/scope';
 import { useInstitutions, useSettings } from '@/app/hooks';
@@ -58,7 +62,7 @@ function NavList({ onNavigate, idPrefix }: { onNavigate?: () => void; idPrefix: 
               <ul className="flex min-h-0 flex-col gap-0.5 overflow-hidden pb-2">
                 {NAV.filter((n) => n.group === g).map(({ to, label, icon: Icon }) => (
                   <li key={to}>
-                    <NavLink to={to} end={to === '/'} onClick={onNavigate}
+                    <NavLink to={to} end={to === '/'} onClick={onNavigate} {...intent(to)}
                       className={({ isActive }) => cn('group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition',
                         isActive ? 'bg-surface-3 font-medium text-fg' : 'text-muted hover:bg-surface-2 hover:text-fg')}>
                       {({ isActive }) => (<>
@@ -104,6 +108,7 @@ function ThemeToggle() {
 
 export function AppShell() {
   useAppIcon(); // logo personalizada também na aba e no atalho da tela inicial
+  React.useEffect(() => { prefetchIdle(); }, []); // código das telas leves, com o navegador ocioso
   const [open, setOpen] = React.useState(false);
   const loc = useLocation();
   const { mode, email, signOut } = useAuth();
@@ -165,7 +170,7 @@ export function AppShell() {
         </main>
         <nav aria-label="Atalhos" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border/60 bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
           {NAV.filter((n) => MOBILE_TABS.includes(n.to)).map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => cn('flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium', isActive ? 'text-gold' : 'text-muted')}>
+            <NavLink key={to} to={to} end={to === '/'} {...intent(to)} className={({ isActive }) => cn('flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium', isActive ? 'text-gold' : 'text-muted')}>
               <Icon size={20} aria-hidden />{label.split(' ')[0]}
             </NavLink>
           ))}

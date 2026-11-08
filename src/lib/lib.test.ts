@@ -93,3 +93,19 @@ describe('validações da revisão', () => {
     expect(isoDay(null)).toBeNull();
   });
 });
+
+import { mergeById, pool } from './utils';
+describe('utilitários de desempenho', () => {
+  it('pool: no máximo N ao mesmo tempo, ordem preservada', async () => {
+    let open = 0, max = 0;
+    const out = await pool([1, 2, 3, 4, 5, 6, 7], 3, async (n) => { open++; max = Math.max(max, open); await new Promise((r) => setTimeout(r, 5)); open--; return n * 2; });
+    expect(out).toEqual([2, 4, 6, 8, 10, 12, 14]);
+    expect(max).toBe(3);
+  });
+  it('pool: relança o primeiro erro', async () => {
+    await expect(pool([1, 2, 3], 2, async (n) => { if (n === 2) throw new Error('falhou'); return n; })).rejects.toThrow('falhou');
+  });
+  it('mergeById: junta alterações do mesmo registro', () => {
+    expect(mergeById([{ id: 'a', patch: { x: 1 } }, { id: 'b', patch: { y: 2 } }, { id: 'a', patch: { z: 3 } }])).toEqual([{ id: 'a', patch: { x: 1, z: 3 } }, { id: 'b', patch: { y: 2 } }]);
+  });
+});

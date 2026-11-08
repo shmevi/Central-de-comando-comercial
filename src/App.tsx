@@ -4,22 +4,23 @@ import { AuthProvider, useAuth } from '@/app/auth';
 import { ScopeProvider } from '@/app/scope';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppShell } from '@/components/layout/AppShell';
+import { PAGE_LOADERS } from '@/app/routes';
 import { ErrorState, Loading } from '@/components/ui/misc';
 import Hoje from '@/pages/Hoje';
 import Login, { ConfigError, SetPassword } from '@/pages/Login';
 
-const Rotina = lazy(() => import('@/pages/Rotina'));
-const Agenda = lazy(() => import('@/pages/Agenda'));
-const Tarefas = lazy(() => import('@/pages/Tarefas'));
-const Equipes = lazy(() => import('@/pages/Equipes'));
-const EquipePessoa = lazy(() => import('@/pages/EquipePessoa'));
-const Treinamentos = lazy(() => import('@/pages/Treinamentos'));
-const Reunioes = lazy(() => import('@/pages/Reunioes'));
-const Okrs = lazy(() => import('@/pages/Okrs'));
-const Projetos = lazy(() => import('@/pages/Projetos'));
-const Relatorios = lazy(() => import('@/pages/Relatorios'));
-const Integracoes = lazy(() => import('@/pages/Integracoes'));
-const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
+const Rotina = lazy(PAGE_LOADERS['/rotina']);
+const Agenda = lazy(PAGE_LOADERS['/agenda']);
+const Tarefas = lazy(PAGE_LOADERS['/tarefas']);
+const Equipes = lazy(PAGE_LOADERS['/equipes']);
+const EquipePessoa = lazy(PAGE_LOADERS['/equipes/:personId']);
+const Treinamentos = lazy(PAGE_LOADERS['/treinamentos']);
+const Reunioes = lazy(PAGE_LOADERS['/reunioes']);
+const Okrs = lazy(PAGE_LOADERS['/okrs']);
+const Projetos = lazy(PAGE_LOADERS['/projetos']);
+const Relatorios = lazy(PAGE_LOADERS['/relatorios']);
+const Integracoes = lazy(PAGE_LOADERS['/integracoes']);
+const Configuracoes = lazy(PAGE_LOADERS['/configuracoes']);
 
 function NotFound() { return <ErrorState message="Página não encontrada." />; }
 

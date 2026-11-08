@@ -34,3 +34,12 @@ describe('limite da logo', () => {
     expect((await validateLogo(file(quatroMB, 'logo.png', 'image/png'), 'local')).ok).toBe(false);
   });
 });
+
+describe('otimização da logo', () => {
+  it('reduz para caber em 512 px mantendo a proporção (nunca aumenta)', async () => {
+    const { fitWithin } = await import('./branding');
+    expect(fitWithin(3000, 1500)).toEqual({ w: 512, h: 256 });
+    expect(fitWithin(800, 1600)).toEqual({ w: 256, h: 512 });
+    expect(fitWithin(200, 100)).toEqual({ w: 200, h: 100 });
+  });
+});

@@ -2,7 +2,8 @@ import * as React from 'react';
 import { DATA_MODE } from '@/data';
 import { AUTH_LINK_TYPE, DATA_CONFIG, supabase } from '@/data/supabaseClient';
 import { ensureSeed, resetSeedGuard } from '@/data/seed';
-import { resetStore } from '@/data/store';
+import { prefetch, resetStore } from '@/data/store';
+import { HOME_DATA } from '@/data/prefetch';
 
 /**
  * - loading: iniciando
@@ -44,7 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = React.useState<string | null>(null);
 
   const boot = React.useCallback(async () => {
-    try { await ensureSeed(); setStatus('ready'); }
+    // Os dados da tela inicial são pedidos JÁ, em paralelo com a checagem do 1º acesso (antes: uma onda
+    // esperando a outra). Se for o 1º acesso e o seed criar dados, o cache é zerado e a tela relê tudo.
+    void prefetch(HOME_DATA);
+    try { if (await ensureSeed()) resetStore(false); setStatus('ready'); }
     catch (e) { setError((e as Error).message); setStatus('error'); }
   }, []);
 

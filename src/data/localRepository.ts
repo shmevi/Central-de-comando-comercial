@@ -1,6 +1,6 @@
 import type { BaseEntity, Collection } from '@/domain/types';
 import { uid, nowIso } from '@/lib/utils';
-import { Repository, RepositoryError } from './repository';
+import { RECENT_LIMIT, Repository, RepositoryError, type ListOptions } from './repository';
 
 const PREFIX = 'ccc:v1:';
 
@@ -18,13 +18,19 @@ function write<T>(key: string, items: T[]) {
 /** Persistência no navegador (modo local/offline). */
 export class LocalRepository<T extends BaseEntity> implements Repository<T> {
   constructor(private collection: Collection) {}
-  async list() { return read<T>(this.collection); }
+  async list(opts: ListOptions = {}) {
+    const all = read<T>(this.collection);
+    const recent = opts.all ? undefined : RECENT_LIMIT[this.collection];
+    return recent ? all.slice(-recent) : all;
+  }
   async create(input: any) {
-    const items = read<T>(this.collection);
+    return (await this.createMany([input]))[0];
+  }
+  async createMany(inputs: any[]) {
     const now = nowIso();
-    const item = { ...input, id: input.id ?? uid(), created_at: now, updated_at: now, user_id: 'local' } as T;
-    write(this.collection, [...items, item]);
-    return item;
+    const made = inputs.map((input) => ({ ...input, id: input.id ?? uid(), created_at: now, updated_at: now, user_id: 'local' }) as T);
+    write(this.collection, [...read<T>(this.collection), ...made]);
+    return made;
   }
   async update(id: string, patch: Partial<T>) {
     const items = read<T>(this.collection);
