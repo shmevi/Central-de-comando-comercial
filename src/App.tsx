@@ -12,6 +12,7 @@ const Rotina = lazy(() => import('@/pages/Rotina'));
 const Agenda = lazy(() => import('@/pages/Agenda'));
 const Tarefas = lazy(() => import('@/pages/Tarefas'));
 const Equipes = lazy(() => import('@/pages/Equipes'));
+const EquipePessoa = lazy(() => import('@/pages/EquipePessoa'));
 const Treinamentos = lazy(() => import('@/pages/Treinamentos'));
 const Reunioes = lazy(() => import('@/pages/Reunioes'));
 const Okrs = lazy(() => import('@/pages/Okrs'));
@@ -39,6 +40,7 @@ function Gate() {
             <Route path="agenda" element={<Agenda />} />
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="equipes" element={<Equipes />} />
+            <Route path="equipes/:personId" element={<EquipePessoa />} />
             <Route path="treinamentos" element={<Treinamentos />} />
             <Route path="reunioes" element={<Reunioes />} />
             <Route path="okrs" element={<Okrs />} />

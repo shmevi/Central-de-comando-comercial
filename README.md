@@ -66,6 +66,8 @@ Nenhum projeto Supabase foi criado ou conectado por este repositório. Siga na o
    - `0005_notion_access.sql` — vínculo conta ↔ pessoa no Notion (quem pode ler o Notion pela Central). Depois de aplicar,
      libere cada conta no SQL Editor: `insert into public.notion_access (user_id, person_id) select id, '<id-no-notion>' from auth.users where email = '<e-mail>';`
    - `0006_tarefas_atribuicao.sql` — coluna `tasks.attribution` (ATRIBUIÇÃO 70% / 20% / 10% / OFF WORK, como no Notion). Só adiciona.
+   - `0007_person_metrics.sql` — Feedback em números: tabela `person_metrics` (leads, matrículas e valor por pessoa × instituição ×
+     mês, com RLS) e `feedbacks.metrics_snapshot` (números congelados no feedback). Só adiciona; pode ser reaplicada.
 3. **Fechar o cadastro público** — **Authentication → Sign In / Providers** → desligue **Allow new users to sign up**.
    Deixe **Email** ligado e **Confirm email** ligado.
 4. **Criar o seu usuário** — **Authentication → Users → Add user → Create new user**: e-mail, senha forte e marque
@@ -133,7 +135,7 @@ src/
   integrations/   Notion: contrato do adaptador, adaptador de demonstração, sincronização
   lib/            datas/fuso, jornada, conflitos, OKR, PIN, convite WhatsApp
   pages/          uma tela por módulo
-supabase/         migrations 0001–0006 (esquema, Notion, relatórios/logo, vínculo Notion, atribuição + RLS e Storage), Edge Function notion-sync e testes de RLS
+supabase/         migrations 0001–0007 (esquema, Notion, relatórios/logo, vínculo Notion, atribuição, números da equipe + RLS e Storage), Edge Function notion-sync e testes de RLS
 e2e/              testes no navegador e servidor que imita a hospedagem
 scripts/          gerador de vercel.json / netlify.toml
 docs/             arquitetura, checklist de testes, status funcional

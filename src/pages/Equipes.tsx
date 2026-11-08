@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Lock, MessageSquarePlus, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
+import { BarChart3, Lock, MessageSquarePlus, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { useSettings } from '@/app/hooks';
@@ -15,6 +16,8 @@ import type { Feedback, Person } from '@/domain/types';
 import { fmtDate, todayISO } from '@/lib/time';
 import { nowIso } from '@/lib/utils';
 import { checkPin } from '@/lib/pin';
+import { MetricsTab } from '@/features/metrics/MetricsTab';
+import { FeedbackMetricsPanel, FeedbackMetricsSummary, hasSnapshot, snapshotFor } from '@/features/metrics/FeedbackMetrics';
 
 function PersonDialog({ open, onOpenChange, person }: { open: boolean; onOpenChange: (o: boolean) => void; person: Person | null }) {
   const toast = useToast();
@@ -47,6 +50,7 @@ function PersonDialog({ open, onOpenChange, person }: { open: boolean; onOpenCha
 
 function FeedbackDialog({ open, onOpenChange, feedback, personId }: { open: boolean; onOpenChange: (o: boolean) => void; feedback: Feedback | null; personId?: string }) {
   const people = useCollection('people');
+  const metrics = useCollection('person_metrics');
   const toast = useToast();
   const empty = (): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => ({ person_id: personId ?? '', institution_id: null, date: todayISO(), positives: '', to_develop: '', action_plan: '', deadline: null, status: 'aberto', reviews: [], confidential: true });
   const { d, set, err, setErr } = useDraft(open, () => (feedback ? { ...feedback } : empty()), [feedback, personId]);
@@ -62,7 +66,10 @@ function FeedbackDialog({ open, onOpenChange, feedback, personId }: { open: bool
     if (!d.positives.trim() && !d.to_develop.trim()) e.positives = 'Preencha pontos positivos ou a desenvolver.';
     if (d.deadline && d.deadline < d.date) e.deadline = 'O prazo deve ser após a data do feedback.';
     setErr(e); if (Object.keys(e).length) return;
-    try { feedback ? await actions.update('feedbacks', feedback.id, d) : await actions.create('feedbacks', d); toast('Feedback salvo.'); onOpenChange(false); }
+    // Números congelados: no feedback NOVO grava a foto dos lançamentos (só valores digitados). Feedback existente
+    // mantém a foto original; feedback antigo (sem foto) não ganha números de hoje com data de antes.
+    const payload = feedback ? d : { ...d, metrics_snapshot: snapshotFor(metrics.items, d.person_id, d.institution_id, d.date, nowIso()) };
+    try { feedback ? await actions.update('feedbacks', feedback.id, payload) : await actions.create('feedbacks', payload); toast('Feedback salvo.'); onOpenChange(false); }
     catch (er) { toast((er as Error).message, 'erro'); }
   }
   const lastProgress = d.reviews.at(-1)?.progress ?? 0;
@@ -79,6 +86,14 @@ function FeedbackDialog({ open, onOpenChange, feedback, personId }: { open: bool
         <TextArea className="sm:col-span-2" label="Plano de ação" value={d.action_plan} onChange={(e) => set('action_plan', e.target.value)} />
         <SelectField label="Status" value={d.status} onChange={(e) => set('status', e.target.value)} options={[{ value: 'aberto', label: 'Aberto' }, { value: 'em_acompanhamento', label: 'Em acompanhamento' }, { value: 'concluido', label: 'Concluído' }]} />
         <Checkbox className="self-end" label="Confidencial" checked={d.confidential} onChange={(v) => set('confidential', v)} />
+        <div className="sm:col-span-2">
+          {feedback ? (hasSnapshot(feedback)
+            ? <FeedbackMetricsPanel snapshot={feedback.metrics_snapshot} date={feedback.date} frozen />
+            : <p className="rounded-lg border border-border p-3 text-xs text-muted">Feedback registrado antes do painel de números: sem números congelados.</p>)
+            : d.person_id && d.institution_id
+              ? <FeedbackMetricsPanel snapshot={snapshotFor(metrics.items, d.person_id, d.institution_id, d.date || todayISO(), nowIso())} date={d.date || todayISO()} frozen={false} />
+              : <p className="rounded-lg border border-border p-3 text-xs text-muted">Escolha a pessoa e a instituição para ver os números.</p>}
+        </div>
         <fieldset className="sm:col-span-2 rounded-lg border border-border p-3">
           <legend className="label px-1">Revisões ({d.reviews.length})</legend>
           {d.reviews.length > 0 && <Progress className="mb-2" value={lastProgress} label="Evolução do plano" />}
@@ -121,12 +136,20 @@ export default function Equipes() {
   const { matches } = useScope();
   const { confirm, confirmNode } = useConfirm();
   const toast = useToast();
-  const [tab, setTab] = React.useState<'pessoas' | 'feedbacks'>('pessoas');
+  const [params, setParams] = useSearchParams();
+  const aba = params.get('aba');
+  const tab: 'pessoas' | 'numeros' | 'feedbacks' = aba === 'numeros' || aba === 'feedbacks' ? aba : 'pessoas';
+  const setTab = (t: 'pessoas' | 'numeros' | 'feedbacks') => { const n = new URLSearchParams(params); if (t === 'pessoas') n.delete('aba'); else n.set('aba', t); n.delete('feedback'); setParams(n, { replace: true }); };
   const [q, setQ] = React.useState('');
   const [unlocked, setUnlocked] = React.useState(unlockedThisSession);
   const [editP, setEditP] = React.useState<Person | null>(null); const [newP, setNewP] = React.useState(false);
   const [editF, setEditF] = React.useState<Feedback | null>(null); const [newF, setNewF] = React.useState<string | null>(null);
+  // Vindo da página da pessoa: /equipes?aba=feedbacks&feedback=<id> abre o novo feedback (depois do PIN, se houver)
+  const fbParam = params.get('feedback');
   const restricted = settings.permissions.feedbacks_restricted && !unlocked;
+  React.useEffect(() => {
+    if (tab === 'feedbacks' && fbParam && !restricted) { setNewF(fbParam); const n = new URLSearchParams(params); n.delete('feedback'); setParams(n, { replace: true }); }
+  }, [tab, fbParam, restricted]); // eslint-disable-line react-hooks/exhaustive-deps
   const pById = Object.fromEntries(people.items.map((p) => [p.id, p]));
   const ps = people.items.filter((p) => matches(p.institution_ids)).filter((p) => !q || `${p.name} ${p.role}`.toLowerCase().includes(q.toLowerCase()));
   const fs = feedbacks.items.filter((f) => matches(f.institution_id)).filter((f) => !q || (pById[f.person_id]?.name ?? '').toLowerCase().includes(q.toLowerCase())).sort((a, b) => b.date.localeCompare(a.date));
@@ -142,10 +165,10 @@ export default function Equipes() {
   return (
     <div>
       <PageHeader title="Equipes e Feedbacks" subtitle={`${ps.length} pessoa(s)`}
-        actions={<><Segmented label="Seção" value={tab} onChange={setTab} options={[{ value: 'pessoas', label: 'Pessoas' }, { value: 'feedbacks', label: 'Feedbacks' }]} />
-          {tab === 'pessoas' ? <Button onClick={() => setNewP(true)}><UserPlus size={16} />Pessoa</Button> : !restricted && <Button onClick={() => setNewF('')}><MessageSquarePlus size={16} />Feedback</Button>}</>} />
+        actions={<><Segmented label="Seção" value={tab} onChange={setTab} options={[{ value: 'pessoas', label: 'Pessoas' }, { value: 'numeros', label: 'Números' }, { value: 'feedbacks', label: 'Feedbacks' }]} />
+          {tab === 'pessoas' ? <Button onClick={() => setNewP(true)}><UserPlus size={16} />Pessoa</Button> : tab === 'feedbacks' && !restricted && <Button onClick={() => setNewF('')}><MessageSquarePlus size={16} />Feedback</Button>}</>} />
       <SearchInput id="busca-eq" className="mb-3 max-w-md" placeholder="Buscar por nome…" value={q} onChange={setQ} />
-      {people.error ? <ErrorState message={people.error} onRetry={people.reload} /> : people.loading ? <Loading /> : tab === 'pessoas' ? (
+      {people.error ? <ErrorState message={people.error} onRetry={people.reload} /> : people.loading ? <Loading /> : tab === 'numeros' ? <MetricsTab q={q} /> : tab === 'pessoas' ? (
         ps.length === 0 ? <EmptyState title="Nenhuma pessoa" description="Cadastre a equipe comercial e vincule cada pessoa às instituições em que atua." action={<Button onClick={() => setNewP(true)}><Plus size={16} />Pessoa</Button>} /> : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {ps.map((p) => (
@@ -156,7 +179,10 @@ export default function Equipes() {
                 </div>
                 <div className="flex flex-wrap gap-1">{p.institution_ids.map((i) => <InstitutionBadge key={i} id={i} />)}</div>
                 {!restricted && <div className="mt-auto text-xs text-muted">{feedbacks.items.filter((f) => f.person_id === p.id).length} feedback(s)</div>}
-                <Button variant="secondary" size="sm" className="mt-auto" onClick={() => { setTab('feedbacks'); if (!restricted) setNewF(p.id); }}><MessageSquarePlus size={14} />Dar feedback</Button>
+                <div className="mt-auto flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" asChild><Link to={`/equipes/${p.id}`} aria-label={`Números de ${p.name}`}><BarChart3 size={14} />Números</Link></Button>
+                  <Button variant="secondary" size="sm" onClick={() => { setTab('feedbacks'); if (!restricted) setNewF(p.id); }}><MessageSquarePlus size={14} />Dar feedback</Button>
+                </div>
               </Card></li>
             ))}
           </ul>
@@ -178,6 +204,7 @@ export default function Equipes() {
                 <div><dt className="label">A desenvolver</dt><dd>{f.to_develop || '—'}</dd></div>
                 <div><dt className="label">Plano de ação</dt><dd>{f.action_plan || '—'}</dd></div>
               </dl>
+              <FeedbackMetricsSummary f={f} />
             </Card></li>
           ))}
         </ul>

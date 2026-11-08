@@ -162,6 +162,31 @@ async function handle(route) {
   await p.waitForSelector('li:has-text("Conquista no Supabase")');
   ok((db.report_entries || []).some((e) => e.text === 'Conquista no Supabase' && e.user_id === uidA && e.kind === 'conquista'), 'conquista salva em report_entries no Supabase');
 
+  // Feedback em números no Supabase: lançamento gravado com o user_id do banco, sem conversão/ticket; feedback com snapshot
+  await p.goto(BASE + '/equipes'); await p.getByRole('button', { name: 'Pessoa', exact: true }).first().click();
+  await p.fill('role=dialog >> label:has-text("Nome") >> xpath=following-sibling::input', 'Pessoa Supabase');
+  await p.click('role=dialog >> label:has-text("CPPEM")'); await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(400);
+  await p.goto(BASE + '/equipes?aba=numeros'); await p.waitForSelector('text=Lançar');
+  await p.getByRole('combobox', { name: /^Instituição/ }).first().selectOption({ label: 'CPPEM' }); await p.waitForTimeout(200);
+  const nc = p.locator('li:has-text("Pessoa Supabase")');
+  await nc.getByRole('button', { name: /^Lançar / }).click();
+  await p.fill('role=dialog >> label:text-is("Leads") >> xpath=following-sibling::input', '50');
+  await p.fill('role=dialog >> label:text-is("Matrículas") >> xpath=following-sibling::input', '10');
+  await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(500);
+  ok(await nc.locator('text=20,0%').count() === 1 && await nc.locator('dd:text-is("—")').count() >= 2, 'Supabase: conversão calculada e valor/ticket vazios como "—"');
+  const pm = (db.person_metrics || [])[0] || {};
+  ok((db.person_metrics || []).length === 1 && pm.user_id === uidA && pm.leads === 50 && pm.revenue === null && !('conversion' in pm) && !('ticket' in pm), 'Supabase: lançamento gravado com user_id do banco e sem campos calculados');
+  await p.goto(BASE + '/equipes?aba=feedbacks'); await p.waitForTimeout(300);
+  const ent = p.locator('button:has-text("Entrar mesmo assim")'); if (await ent.count()) { await ent.click(); await p.waitForTimeout(200); }
+  await p.getByRole('button', { name: 'Feedback', exact: true }).first().click();
+  await p.locator('role=dialog >> select').first().selectOption({ label: 'Pessoa Supabase' });
+  await p.locator('role=dialog >> select').nth(1).selectOption({ label: 'CPPEM' });
+  await p.fill('role=dialog >> label:has-text("Pontos positivos") >> xpath=following-sibling::textarea', 'Feedback com números');
+  await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(500);
+  const fb = (db.feedbacks || []).find((f) => f.positives === 'Feedback com números');
+  ok(!!fb && fb.metrics_snapshot?.months?.length === 1 && fb.metrics_snapshot.months[0].leads === 50 && !('conversion' in fb.metrics_snapshot.months[0]), 'Supabase: feedback salvo com os números congelados (só valores digitados)');
+  await p.goto(BASE + '/'); await p.waitForSelector('text=Missão do dia');
+
   // Notion REAL (modo Supabase): configurar, ativar e sincronizar pela Edge Function — sem banner de demonstração
   await p.goto(BASE + '/integracoes'); await p.waitForSelector('text=Notion real, lido pelo servidor');
   ok(await p.locator('text=Modo demonstração.').count() === 0, 'Integrações no modo Supabase não usa o adaptador de demonstração');

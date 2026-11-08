@@ -197,6 +197,8 @@ function WorkdaySection() {
   );
 }
 
+const OPTIONAL_COLLECTIONS: string[] = ['notion_sync_state', 'person_metrics'];
+
 export default function Configuracoes() {
   const { settings, save } = useSettings();
   const { email, mode } = useAuth();
@@ -208,8 +210,8 @@ export default function Configuracoes() {
   async function exportBackup() {
     const out: Record<string, unknown> = { exported_at: new Date().toISOString(), version: 1 };
     for (const c of COLLECTIONS) {
-      // notion_sync_state só existe depois da migration 0002: sem ela, o backup segue sem essa coleção.
-      try { out[c] = await repo(c).list(); } catch (e) { if (c !== 'notion_sync_state') throw e; }
+      // Tabelas de migrations opcionais (0002: notion_sync_state; 0007: person_metrics): sem elas, o backup segue sem a coleção.
+      try { out[c] = await repo(c).list(); } catch (e) { if (!OPTIONAL_COLLECTIONS.includes(c)) throw e; }
     }
     download(`central-comando-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(out, null, 2), 'application/json');
   }
@@ -226,7 +228,7 @@ export default function Configuracoes() {
       for (const c of COLLECTIONS) {
         if (c === 'settings' || !Array.isArray(data[c])) continue;
         let existing: { id: string; external_ref?: string | null }[];
-        try { existing = await repo(c).list(); } catch (e) { if (c === 'notion_sync_state') continue; throw e; }
+        try { existing = await repo(c).list(); } catch (e) { if (OPTIONAL_COLLECTIONS.includes(c)) continue; throw e; }
         const ids = new Set(existing.map((x) => x.id));
         // external_ref é único por usuário (migration 0002): item do Notion já presente não é duplicado.
         const refs = new Set(existing.map((x) => x.external_ref).filter(Boolean));

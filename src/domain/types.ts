@@ -120,6 +120,30 @@ export interface Feedback extends BaseEntity {
   status: 'aberto' | 'em_acompanhamento' | 'concluido';
   reviews: FeedbackReview[];
   confidential: boolean;
+  /** Números da pessoa congelados ao salvar o feedback (só valores digitados; conversão/ticket são calculados). */
+  metrics_snapshot?: MetricsSnapshot | Record<string, never>;
+}
+
+/**
+ * Lançamento mensal digitado: 1 por pessoa × instituição × mês (month = 1º dia, yyyy-mm-01).
+ * Conversão e ticket médio NÃO são gravados — sempre calculados (src/lib/metrics.ts).
+ */
+export interface PersonMetric extends BaseEntity {
+  person_id: ID;
+  institution_id: ID;
+  month: string;
+  leads: number;
+  enrollments: number;
+  /** R$; null = não informado (ticket fica "—"). */
+  revenue: number | null;
+  notes: string;
+}
+
+/** Foto dos lançamentos no momento do feedback. */
+export interface MetricsSnapshot {
+  taken_at: string;
+  institution_id: ID | null;
+  months: { month: string; institution_id: ID; leads: number; enrollments: number; revenue: number | null }[];
 }
 
 export type CandidateStage =
@@ -356,6 +380,7 @@ export interface EntityMap {
   notes: Note;
   people: Person;
   feedbacks: Feedback;
+  person_metrics: PersonMetric;
   candidates: Candidate;
   interviews: Interview;
   trainings: Training;
@@ -374,6 +399,6 @@ export interface EntityMap {
 export type Collection = keyof EntityMap;
 export const COLLECTIONS: Collection[] = [
   'institutions', 'tasks', 'routine_templates', 'routine_blocks', 'agenda_events', 'notes',
-  'people', 'feedbacks', 'candidates', 'interviews', 'trainings', 'meetings', 'systems',
+  'people', 'feedbacks', 'person_metrics', 'candidates', 'interviews', 'trainings', 'meetings', 'systems',
   'improvements', 'objectives', 'projects', 'sync_logs', 'review_queue', 'notion_sync_state', 'report_entries', 'settings',
 ];

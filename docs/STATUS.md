@@ -30,6 +30,9 @@
 - **Conteúdo das páginas do Notion**: o conteúdo de dentro da página (texto, listas, checklists) vira a descrição da
   tarefa; nos KRs aparecem "Descrição", "Motivo" e o conteúdo da página. Espelho somente leitura (Notion → Central),
   lido só das páginas do responsável; imagens, arquivos e bases internas aparecem como aviso "abra no Notion".
+- **Feedback em números** (Equipes): lançamento mensal de leads, matrículas e valor por pessoa × instituição; conversão e
+  ticket médio calculados (nunca gravados); página da pessoa com variação, média de 3 meses, média da equipe, gráficos e
+  tabela; painel no feedback com os números congelados ao salvar. Tabela `person_metrics` (migration 0007).
 - **Quadros iguais aos do Notion**: OKRs em "Kanban por Objetivo" (colunas = Objetivos, só KRs ativos, status no cartão)
   e Tarefas agrupadas por ATRIBUIÇÃO (70% / 20% / 10% / OFF WORK, só ativas) ou por status com os nomes do Notion.
 

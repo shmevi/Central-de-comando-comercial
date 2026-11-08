@@ -35,7 +35,8 @@ Lucide · Recharts · jsPDF (PDF) · Supabase JS · fontes Inter e Barlow Conden
 | `/rotina` | Minha Rotina | timeline editável, status (planejado/em andamento/concluído/adiado), intervalo protegido com exceção explícita, visões dia/semana, conflitos |
 | `/agenda` | Agenda Semanal | foco por dia, visões dia/semana/mês, eventos + entrevistas + reuniões, detecção de conflitos |
 | `/tarefas` | Tarefas | CRUD, instituição, prioridade, prazo, checklist, recorrência, histórico, lista/Kanban, filtros, busca |
-| `/equipes` | Equipes e Feedbacks | pessoas multi-instituição, feedback (positivos, a desenvolver, plano, prazo, revisões), acesso restrito |
+| `/equipes` | Equipes e Feedbacks | pessoas multi-instituição; aba **Números** (lançamento mensal); feedback (positivos, a desenvolver, plano, prazo, revisões, números congelados), acesso restrito |
+| `/equipes/:id` | Números da pessoa | mês com variação, média de 3 meses, média da equipe (mesma instituição e mês), gráficos de conversão e ticket, tabela mês a mês |
 | `/treinamentos` | Treinamentos | catálogo, trilhas, presença e nota |
 | `/reunioes` | Reuniões | modelos, pauta, decisões, ata, encaminhamentos (responsável e prazo) → tarefa |
 | `/okrs` | OKRs | objetivos por instituição e ciclo; progresso só com meta válida |
@@ -47,10 +48,21 @@ Lucide · Recharts · jsPDF (PDF) · Supabase JS · fontes Inter e Barlow Conden
 ## Modelo de dados
 
 Todas as tabelas têm `id`, `user_id`, `created_at`, `updated_at`, `is_demo`, `external_ref`.
-Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/` (0001 base, 0002 Notion, 0003 relatórios/logo, 0004 logo 5 MB, 0005 vínculo Notion).
+Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/` (0001 base, 0002 Notion, 0003 relatórios/logo, 0004 logo 5 MB, 0005 vínculo Notion, 0006 atribuição, 0007 números da equipe).
 
 > **Recrutamento** e **Sistemas e Melhorias** foram retirados da interface (menu, rotas e telas). As tabelas
 > `candidates`, `interviews`, `systems` e `improvements` **continuam no banco com os dados intactos** e entram no backup.
+
+| Tabela (0007) | Campos-chave | Regras |
+|---|---|---|
+| person_metrics | person_id, institution_id, month (dia 1), leads, enrollments, revenue (opcional), notes | RLS por usuário; 1 por pessoa × instituição × mês; valores ≥ 0; pessoa e instituição do mesmo usuário; apagar instituição com lançamentos é recusado |
+| feedbacks.metrics_snapshot | `{ taken_at, institution_id, months[] }` só com valores digitados | default `{}` (inserts antigos continuam válidos) |
+
+**Feedback em números** (`src/lib/metrics.ts`, funções puras): conversão = matrículas ÷ leads; ticket = valor ÷ matrículas —
+sempre calculados, nunca gravados. Divisor 0 ou valor vazio → "—"; mês sem lançamento fica vazio (sem zero ou estimativa);
+somas antes de dividir (média ponderada); matrículas > leads é aceito e só sinalizado. Período: 6 meses fechados + mês atual.
+Variação: p.p. na conversão e % no ticket; média de 3 meses = 3 meses anteriores com lançamento; média da equipe só com
+outras pessoas na mesma instituição e mês. Telas sem meta e sem cor de bom/ruim.
 
 | Tabela (0003) | Campos-chave | Regras |
 |---|---|---|

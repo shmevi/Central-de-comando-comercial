@@ -1,7 +1,7 @@
 // Teste de fumaça E2E: node e2e/smoke.cjs [baseURL]  (requer `npm run dev` ativo)
 const { chromium } = require('playwright');
 const BASE = process.argv[2] || 'http://localhost:5173';
-const ROUTES = ['/', '/rotina', '/agenda', '/tarefas', '/equipes', '/treinamentos', '/reunioes', '/okrs', '/projetos', '/relatorios', '/integracoes', '/configuracoes'];
+const ROUTES = ['/', '/rotina', '/agenda', '/tarefas', '/equipes', '/equipes?aba=numeros', '/treinamentos', '/reunioes', '/okrs', '/projetos', '/relatorios', '/integracoes', '/configuracoes'];
 let fails = 0;
 const recifeToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Recife' }).format(new Date());
 const isoMinusDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
@@ -210,6 +210,69 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   ok(dl.suggestedFilename().endsWith('.csv'), 'exporta CSV');
   const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("PDF")')]);
   ok(dl2.suggestedFilename().endsWith('.pdf'), 'exporta PDF');
+
+  // Feedback em números: lançar mês → conversão e ticket calculados → editar/excluir → página da pessoa → feedback com painel congelado
+  {
+    const NOME = 'Pessoa Números E2E';
+    await p.goto(BASE + '/equipes'); await p.getByRole('button', { name: 'Pessoa', exact: true }).first().click();
+    await p.fill('role=dialog >> label:has-text("Nome") >> xpath=following-sibling::input', NOME);
+    await p.click('role=dialog >> label:has-text("CPPEM")'); await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
+    await p.goto(BASE + '/equipes?aba=numeros'); await p.waitForSelector('text=Lançar');
+    await p.getByRole('combobox', { name: /^Instituição/ }).first().selectOption({ label: 'CPPEM' }); await p.waitForTimeout(200);
+    const card = p.locator(`li:has-text("${NOME}")`);
+    const field = (label) => p.locator(`role=dialog >> label:text-is("${label}") >> xpath=following-sibling::input`);
+    await card.getByRole('button', { name: /^Lançar / }).click();
+    await field('Leads').fill('40'); await field('Matrículas').fill('10'); await p.locator('role=dialog >> label:has-text("Valor (R$)") >> xpath=following-sibling::input').fill('12.000,00');
+    ok(await p.locator('role=dialog >> text=25,0%').count() === 1 && await p.locator('role=dialog >> text=R$ 1.200,00').count() === 1, 'prévia calcula conversão e ticket no lançamento');
+    await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
+    ok(await card.locator('text=25,0%').count() === 1 && await card.locator('text=R$ 1.200,00').count() === 1, 'Números: conversão (25,0%) e ticket (R$ 1.200,00) calculados');
+    const stored = await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:person_metrics') || '[]').filter((m) => !m.is_demo));
+    ok(stored.length === 1 && stored[0].leads === 40 && stored[0].enrollments === 10 && stored[0].revenue === 12000 && /-01$/.test(stored[0].month) && !('conversion' in stored[0]) && !('ticket' in stored[0]), 'só leads, matrículas e valor são gravados (conversão/ticket nunca)');
+    // editar (com aviso de matrículas > leads, sem bloquear) e conferir
+    await card.getByRole('button', { name: `Editar lançamento de ${NOME}` }).click();
+    await field('Matrículas').fill('50');
+    ok(await p.locator('role=dialog >> text=Matrículas acima dos leads').count() === 1, 'matrículas > leads: só sinaliza');
+    await field('Matrículas').fill('12'); await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
+    ok(await card.locator('text=30,0%').count() === 1 && await card.locator('text=R$ 1.000,00').count() === 1, 'editar recalcula (30,0% · R$ 1.000,00)');
+    // duplicata recusada
+    await p.locator('button:has-text("Lançar")').first().click();
+    await p.locator('role=dialog >> select').first().selectOption({ label: NOME });
+    await field('Leads').fill('1'); await field('Matrículas').fill('1'); await p.click('role=dialog >> button:has-text("Salvar")');
+    ok(await p.locator('role=dialog >> text=Já existe lançamento').count() === 1, 'lançamento duplicado (pessoa × instituição × mês) é recusado');
+    await p.keyboard.press('Escape');
+    // excluir com confirmação → mês fica vazio (sem zero)
+    await card.getByRole('button', { name: `Excluir lançamento de ${NOME}` }).click(); await p.click('role=dialog >> button:has-text("Excluir")'); await p.waitForTimeout(300);
+    ok(await card.locator('text=Sem lançamento').count() === 1 && await card.locator('text=0,0%').count() === 0, 'excluir deixa o mês vazio (sem zero)');
+    await card.getByRole('button', { name: /^Lançar / }).click();
+    await field('Leads').fill('40'); await field('Matrículas').fill('12'); await p.locator('role=dialog >> label:has-text("Valor (R$)") >> xpath=following-sibling::input').fill('12000');
+    await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
+    // página da pessoa
+    await card.getByRole('link', { name: `Ver números de ${NOME}` }).click(); await p.waitForSelector('text=Mês a mês');
+    ok(await p.locator('section[aria-label^="Números de"] >> text=30,0%').count() === 1 && await p.locator('section[aria-label^="Números de"] >> text=R$ 1.000,00').count() === 1, 'página da pessoa: conversão e ticket do mês');
+    ok(await p.locator('text=sem lançamento').count() >= 6, 'meses sem lançamento aparecem vazios na tabela');
+    ok(await p.locator('figure[role="img"]').count() === 2, 'gráficos de conversão e ticket (com descrição acessível)');
+    const personUrl = p.url();
+    // feedback com o painel de números, congelado ao salvar
+    await p.getByRole('link', { name: 'Dar feedback' }).click(); await p.waitForTimeout(300);
+    const enter = p.locator('button:has-text("Entrar mesmo assim")'); if (await enter.count()) { await enter.click(); await p.waitForTimeout(200); }
+    await p.locator('role=dialog').waitFor();
+    await p.locator('role=dialog >> select').nth(1).selectOption({ label: 'CPPEM' });
+    ok(await p.locator('role=dialog >> text=serão congelados ao salvar').count() === 1 && await p.locator('role=dialog >> section[aria-label="Números da pessoa"] >> text=30,0%').count() >= 1, 'feedback mostra o painel com os números da pessoa');
+    await p.fill('role=dialog >> label:has-text("Pontos positivos") >> xpath=following-sibling::textarea', 'Boa conversão no mês.');
+    await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
+    const fbCard = p.locator(`li:has-text("${NOME}"):has-text("Boa conversão")`);
+    ok(await fbCard.locator('text=/Números no feedback .*30,0%/').count() === 1, 'feedback salvo com os números');
+    // mudar o lançamento depois NÃO altera o feedback (congelado)
+    await p.goto(BASE + '/equipes?aba=numeros'); await p.getByRole('combobox', { name: /^Instituição/ }).first().selectOption({ label: 'CPPEM' });
+    await card.getByRole('button', { name: `Editar lançamento de ${NOME}` }).click(); await field('Matrículas').fill('20'); await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
+    await p.goto(BASE + '/equipes?aba=feedbacks'); await p.waitForTimeout(300);
+    const enter2 = p.locator('button:has-text("Entrar mesmo assim")'); if (await enter2.count()) { await enter2.click(); await p.waitForTimeout(200); }
+    ok(await fbCard.locator('text=/30,0%/').count() === 1 && await fbCard.locator('text=/50,0%/').count() === 0, 'números do feedback ficam congelados');
+    // 360px na página da pessoa: sem rolagem horizontal
+    await p.setViewportSize({ width: 360, height: 780 }); await p.goto(personUrl); await p.waitForSelector('text=Mês a mês');
+    ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'página da pessoa sem rolagem horizontal em 360px');
+    await p.setViewportSize({ width: 1366, height: 900 });
+  }
 
   // Logo personalizada (modo local): escolher, prévia, persistir e remover
   await p.goto(BASE + '/configuracoes'); await p.waitForSelector('text=Identidade visual');
