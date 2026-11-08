@@ -2,7 +2,7 @@ import * as React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight, HardDrive, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
 import { NAV, NAV_GROUPS, MOBILE_TABS, type NavGroup } from '@/app/nav';
-import { BrandLogo } from './BrandLogo';
+import { BrandLogo, useAppIcon } from './BrandLogo';
 import { cn } from '@/lib/utils';
 import { useScope } from '@/app/scope';
 import { useInstitutions, useSettings } from '@/app/hooks';
@@ -103,6 +103,7 @@ function ThemeToggle() {
 }
 
 export function AppShell() {
+  useAppIcon(); // logo personalizada também na aba e no atalho da tela inicial
   const [open, setOpen] = React.useState(false);
   const loc = useLocation();
   const { mode, email, signOut } = useAuth();

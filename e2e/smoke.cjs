@@ -219,11 +219,28 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   ok(await p.locator('aside img[alt="Logo da Central"]').count() === 1, 'logo personalizada aparece na barra lateral');
   await p.reload(); await p.waitForSelector('text=Identidade visual');
   ok(await p.locator('text=Logo personalizada em uso.').count() === 1, 'logo persiste após recarregar');
+  // Ícone do app (aba e atalho na tela inicial) = logo enviada
+  await p.waitForFunction(() => document.querySelector('link[rel="manifest"]')?.getAttribute('href')?.startsWith('blob:'), null, { timeout: 5000 }).catch(() => {});
+  const icon = await p.evaluate(() => ({
+    fav: document.querySelector('link[rel="icon"][data-app-icon]')?.getAttribute('href') ?? '',
+    apple: document.querySelector('link[rel="apple-touch-icon"][data-app-icon]')?.getAttribute('href') ?? '',
+    defaultsLeft: document.querySelectorAll('link[rel="icon"]:not([data-app-icon]), link[rel="apple-touch-icon"]:not([data-app-icon])').length,
+  }));
+  ok(icon.fav.startsWith('data:image/png') && icon.apple.startsWith('data:image/png') && icon.defaultsLeft === 0, 'aba e atalho do iPhone usam a logo enviada');
+  // O manifesto como o próprio Chrome lê (respeitando a CSP manifest-src)
+  const cdp = await p.context().newCDPSession(p);
+  const am = await cdp.send('Page.getAppManifest');
+  const m = JSON.parse(am.data || '{}');
+  ok(am.url.startsWith('blob:') && !(am.errors || []).length && (m.icons || []).length === 3 && m.icons.every((i) => i.src.startsWith('data:image/png')) && m.name === 'Central de Comando Comercial' && m.display === 'standalone' && m.start_url === BASE.replace(/\/$/, '') + '/',
+    `manifesto do atalho (Android) com os ícones da logo${(am.errors || []).length ? ` — erros: ${JSON.stringify(am.errors)}` : ''}`);
   await p.setInputFiles('input[aria-label="Arquivo da logo"]', { name: 'falsa.png', mimeType: 'image/png', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>') });
   ok(await p.locator('text=Formato não aceito').waitFor({ timeout: 3000 }).then(() => true, () => false), 'SVG disfarçado de PNG é recusado');
   await p.click('button:has-text("Remover logo personalizada")'); await p.click('role=dialog >> button:has-text("Remover")');
   await p.waitForSelector('text=Usando o monograma padrão');
   ok(await p.locator('aside img[alt="Logo da Central"]').count() === 0, 'sem logo personalizada volta o monograma CP');
+  ok(await p.evaluate(() => document.querySelector('link[rel="manifest"]').getAttribute('href') === '/manifest.webmanifest' && !document.querySelector('link[data-app-icon]') && !!document.querySelector('link[rel="apple-touch-icon"][href="/icons/apple-touch-icon.png"]')),
+    'sem logo, aba e atalho voltam ao ícone CP');
+  ok(await p.evaluate(async () => { const r = await fetch('/manifest.webmanifest'); const m = await r.json(); const imgs = await Promise.all(m.icons.map((i) => fetch(i.src).then((x) => x.ok && x.headers.get('content-type') === 'image/png'))); return r.ok && /manifest\+json/.test(r.headers.get('content-type') || '') && imgs.every(Boolean); }), 'manifesto padrão e ícones PNG publicados');
 
   // Todas as rotas em celular (360/390), tablet e desktop, sem rolagem horizontal
   for (const vp of [{ width: 1366, height: 900 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 360, height: 780 }]) {

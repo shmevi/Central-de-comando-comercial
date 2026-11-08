@@ -102,6 +102,8 @@ iniciais (04, 05 e 06/11/2026). Se você já usava o modo local: **Configuraçõ
 - **Logo:** Configurações → Identidade visual → *Escolher imagem* (PNG, JPG/JPEG ou WEBP; até 5 MB no Supabase).
   Fica no Storage (bucket privado `branding`, pasta da sua conta) e aparece em todos os seus dispositivos. *Remover logo
   personalizada* volta ao monograma CP. No modo local, a imagem fica só no navegador (até 1 MB).
+  A logo também vira o **ícone do app** (aba do navegador e atalho na tela inicial do celular, via `src/app/appIcon.ts`).
+  O celular grava o ícone quando o atalho é criado: depois de trocar a logo, remova o atalho e adicione de novo.
 - **Fonte de identidade (Capture It):** usada em todo o texto da Central. Arquivo em `src/assets/fonts/capture-it.woff2`
   (ou `.woff`/`.ttf`) — veja `src/assets/fonts/README.md` e a licença ao lado. Sem o arquivo, o app usa Inter e Barlow Condensed, sem erro.
 

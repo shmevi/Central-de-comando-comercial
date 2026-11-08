@@ -7,7 +7,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', process.env.DIST_DIR || 'dist');
 const PORT = Number(process.argv[2] || 4173);
 const headers = Object.entries(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'security-headers.json'), 'utf8'))).filter(([k]) => k !== '//');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json', '.png': 'image/png' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
