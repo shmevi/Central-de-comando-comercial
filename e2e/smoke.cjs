@@ -163,6 +163,17 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   await p.click('role=radio[name^="Todas"]');
   ok(await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:tasks') || '[]').length) === totalAntes, 'filtrar não cria nem apaga tarefas');
 
+  // Conteúdo da página do Notion: aparece na tarefa (somente leitura) e no KR
+  await p.goto(BASE + '/tarefas'); await p.click('button:has-text("[Demonstração] Revisar funil de matrículas")');
+  const desc = p.locator('role=dialog >> textarea');
+  ok((await desc.inputValue()).includes('Conferir as etapas do funil') && await desc.getAttribute('readonly') !== null, 'tarefa do Notion mostra o conteúdo da página (somente leitura)');
+  await p.keyboard.press('Escape');
+  await p.goto(BASE + '/okrs'); await p.waitForSelector('text=Kanban por Objetivo');
+  await p.click('section[aria-label] button:has-text("[Demonstração] KR normal")');
+  ok(await p.locator('role=dialog >> text=Matrículas do trimestre').count() === 1 && await p.locator('role=dialog >> text=Como medir').count() === 1, 'KR mostra Descrição e conteúdo da página do Notion');
+  await p.keyboard.press('Escape');
+  ok(await p.locator('text=Conteúdo privado de outra pessoa').count() === 0, 'conteúdo de página de outra pessoa não chega à Central');
+
   // OKRs: "Kanban por Objetivo" como no Notion (colunas = Objetivos, só KRs ativos), status no cartão e envio com confirmação
   await p.goto(BASE + '/okrs'); await p.waitForSelector('text=Kanban por Objetivo');
   ok(await p.locator('section[aria-label="[Demonstração] Objetivo compartilhado"]').count() === 1, 'OKRs: uma coluna por Objetivo');

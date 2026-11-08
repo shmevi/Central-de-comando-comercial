@@ -28,7 +28,7 @@ export interface NotionReader {
 
 export const readerFromAdapter = (adapter: NotionAdapter): NotionReader => ({
   kind: adapter.kind, isDemo: adapter.isDemo,
-  read: async (config, states) => ({ read: await readNotion(adapter, config, states), person_id: config.person_id }),
+  read: async (config, states) => ({ read: await readNotion(adapter, config, states, { bodies: true }), person_id: config.person_id }),
 });
 
 export async function syncNotion(source: NotionAdapter | NotionReader, settings: Settings, saveSettings?: (patch: Partial<Settings>) => Promise<unknown>): Promise<SyncSummary> {

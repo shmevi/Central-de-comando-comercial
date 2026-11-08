@@ -81,7 +81,7 @@ export const taskSyncFields = (t: Pick<Task, 'title' | 'status' | 'priority' | '
 
 // ---------------------------------------------------------------- KRs
 export type KrSyncFields = Required<Pick<KeyResult, 'title' | 'target' | 'current' | 'status' | 'period_start' | 'period_end'>>;
-export interface MappedKr { fields: KrSyncFields; objectiveIds: string[]; notion_progress: number | null }
+export interface MappedKr { fields: KrSyncFields; objectiveIds: string[]; notion_progress: number | null; notes: { description: string | null; reason: string | null } }
 
 export function mapKr(page: NotionPage): MapResult<MappedKr> {
   const P = PROPS.krs;
@@ -95,7 +95,8 @@ export function mapKr(page: NotionPage): MapResult<MappedKr> {
     period_start: period.start,
     period_end: period.end,
   };
-  const mapped = { objectiveIds: relationOf(prop(page, P.objective)), notion_progress: progressOf(prop(page, P.progress)) };
+  const mapped = { objectiveIds: relationOf(prop(page, P.objective)), notion_progress: progressOf(prop(page, P.progress)),
+    notes: { description: textOf(prop(page, P.description)), reason: textOf(prop(page, P.reason)) } };
   if (!title) return { ok: false, problems: [{ field: 'title', value: null, message: 'KR sem título no Notion' }], partial: { ...mapped, fields: { ...fields, title: '' } } };
   return { ok: true, fields: { ...mapped, fields: { ...fields, title } } };
 }

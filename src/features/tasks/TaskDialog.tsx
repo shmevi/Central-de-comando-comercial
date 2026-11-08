@@ -62,7 +62,11 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
         {notion && <p className="panel px-3 py-2.5 text-xs text-muted">Sincronizada do Notion. Título, status, prioridade e prazo alterados aqui ficam marcados como pendentes de envio — o envio ao Notion é uma fase futura.</p>}
         <FormSection title="Essencial">
           <TextField label="Título" required value={d.title} onChange={(e) => set('title', e.target.value)} error={err.title} autoFocus placeholder="O que precisa ser feito?" />
-          <TextArea label="Descrição" rows={3} value={d.description} onChange={(e) => set('description', e.target.value)} placeholder="Contexto, links, próximos passos…" />
+          {notion
+            ? <TextArea label="Descrição (conteúdo da página no Notion)" readOnly rows={Math.min(14, Math.max(3, (d.description || '').split('\n').length + 1))}
+                value={d.description || ''} placeholder="A página no Notion não tem conteúdo."
+                hint="Somente leitura: vem de dentro da página no Notion. Edite lá; a Central atualiza na próxima sincronização." />
+            : <TextArea label="Descrição" rows={3} value={d.description} onChange={(e) => set('description', e.target.value)} placeholder="Contexto, links, próximos passos…" />}
         </FormSection>
         <FormSection title="Classificação">
           <div className="grid gap-4 sm:grid-cols-2">

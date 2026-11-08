@@ -3,12 +3,14 @@
  * Nenhuma tela importa este arquivo, então ele não entra no JavaScript do navegador. O token é recebido por
  * parâmetro (vem de um Edge Secret) e nunca aparece em mensagem de erro ou log.
  *
- * Leitura: GET /data_sources/{id}, POST /data_sources/{id}/query, GET /pages/{id}, GET /pages/{id}/properties/{prop}.
+ * Leitura: GET /data_sources/{id}, POST /data_sources/{id}/query, GET /pages/{id}, GET /pages/{id}/properties/{prop},
+ * GET /blocks/{id}/children (conteúdo da página, só das páginas do responsável).
  * Escrita (só via `update`, chamado pelo envio Central → Notion já validado em pushCore.ts): PATCH /pages/{id} com
  * `properties`. Nunca cria, arquiva ou apaga páginas; nunca mexe em conteúdo (blocos).
  */
 import type { NotionPage, NotionPropertyValue, NotionQuery, NotionSource, NotionStatusGroup, NotionWriteAdapter, NotionWriteValue } from './adapter';
 import { PROPS, normalizePageId, normalizeUserId } from './config';
+import { readBody } from './blocks';
 
 export const NOTION_API = 'https://api.notion.com/v1';
 export const NOTION_VERSION = '2025-09-03';
@@ -197,6 +199,9 @@ export function createNotionApiAdapter(opts: ApiAdapterOptions): NotionWriteAdap
     async statusOptions(source) {
       const m = await groupMap(dsOf(source), statusPropOf(source));
       return [...m.keys()].filter((k) => k.startsWith('name:')).map((k) => k.slice(5));
+    },
+    async body(pageId) {
+      return readBody((blockId, cursor) => call('GET', `/blocks/${toUuid(blockId)}/children?page_size=100${cursor ? `&start_cursor=${encodeURIComponent(cursor)}` : ''}`), pageId);
     },
     async update(source, pageId, properties) {
       const body = { properties: Object.fromEntries(Object.entries(properties).map(([k, v]) => [k, toApi(v)])) };

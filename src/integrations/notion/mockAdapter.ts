@@ -53,10 +53,18 @@ function kr(pid: string, name: string, who: string[], objectives: string[], st: 
     [K.title]: title(`[Demonstração] ${name}`), [K.responsible]: people(...who), [K.objective]: rel(...objectives),
     [K.status]: status(...st), [K.target]: num(target), [K.current]: num(current),
     [K.period]: period ? date(period[0], period[1]) : date(null), [K.progress]: { type: 'formula', value: progress },
+    [K.description]: { type: 'rich_text', text: pid === MOCK_IDS.k_normal ? '[Demonstração] Matrículas do trimestre' : null },
+    [K.reason]: { type: 'rich_text', text: null },
   } };
 }
 
 const M = MOCK_PEOPLE.responsavel, O = MOCK_PEOPLE.outra, I = MOCK_IDS;
+/** Conteúdo (blocos) fictício de algumas páginas, já em texto. */
+export const MOCK_BODIES: Record<string, string> = {
+  [I.t_responsavel]: '[Demonstração] Conferir as etapas do funil:\n• Leads novos\n• Visitas agendadas\n[ ] Exportar relatório do CRM',
+  [I.t_so_outra]: '[Demonstração] Conteúdo privado de outra pessoa',
+  [I.k_normal]: '[Demonstração] Como medir: soma mensal das matrículas confirmadas.',
+};
 export function mockData(): Record<NotionSource, NotionPage[]> {
   return {
     tarefas: [
@@ -123,6 +131,10 @@ export function createMockNotionAdapter(opts: { leaky?: boolean; data?: Record<N
       await wait();
       const want = new Set(ids.map(normalizePageId));
       return data[source].filter((p) => want.has(p.id)).map(clone);
+    },
+    async body(pageId) {
+      await wait();
+      return MOCK_BODIES[normalizePageId(pageId)] ?? '';
     },
     async statusOptions(source) {
       return source === 'tarefas' ? Object.keys(TASK_STATUS_MAP) : [...KR_STATUS_OPTIONS];

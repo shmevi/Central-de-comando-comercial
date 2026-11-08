@@ -36,6 +36,8 @@ export interface NotionPage {
   parent_data_source_id?: string | null;
   archived?: boolean;
   properties: Record<string, NotionPropertyValue | undefined>;
+  /** Conteúdo da página (blocos) em texto. undefined = não foi lido nesta sincronização (a Central mantém o atual). */
+  body?: string;
 }
 
 /** Fontes que a integração lê. */
@@ -74,6 +76,8 @@ export interface NotionAdapter {
    * filtro (ex.: tarefa concluída). Página inexistente ou sem acesso simplesmente não volta.
    */
   retrieve(source: NotionSource, ids: string[]): Promise<NotionPage[]>;
+  /** Conteúdo da página em texto (somente leitura). Opcional: sem ele a Central só não mostra o conteúdo. */
+  body?(pageId: string): Promise<string>;
 }
 
 /** Lê todas as páginas de uma consulta, seguindo o cursor. Limite de páginas evita laço infinito com cursor ruim. */

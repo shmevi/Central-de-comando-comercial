@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarClock, Plus } from 'lucide-react';
+import { CalendarClock, FileText, Plus } from 'lucide-react';
 import { useCollection, actions } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { useSettings } from '@/app/hooks';
@@ -49,6 +49,7 @@ function NotionTaskCard({ t, onOpen, showAttribution }: { t: Task; onOpen: (t: T
         <span className={cn('chip max-w-full', toneChip(PRIORITY_NOTION_TONE[t.priority]))} title={`PRIORIDADE: ${PRIORITY_NOTION[t.priority]}`}><span className="truncate">{isFromNotion(t) ? PRIORITY_NOTION[t.priority] : PRIORITY[t.priority].label}</span></span>
         {t.due_date && <span className={cn('chip border-border/80', late ? 'border-danger/50 text-danger' : 'text-muted')}><CalendarClock size={11} aria-hidden />{fmtDate(t.due_date)}</span>}
         {showAttribution && sortAttribution(t.attribution).map((a) => <span key={a} className={cn('chip', toneChip(attributionTone(a)))}>{a}</span>)}
+        {t.description?.trim() && <span className="chip border-border/80 text-muted" title="Tem descrição — clique na tarefa para ler"><FileText size={11} aria-hidden />Descrição</span>}
         {isFromNotion(t) && <NotionBadge />}{t.is_demo && <DemoBadge />}
       </div>
     </div>

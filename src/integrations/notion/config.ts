@@ -67,7 +67,9 @@ export const PROPS = {
     target: 'Meta',
     current: 'Atual',
     period: 'Período',
-    progress: 'Progresso', // fórmula: somente leitura
+    progress: 'Progresso',
+    description: 'Descrição',
+    reason: 'Motivo:', // fórmula: somente leitura
   },
   objetivos: {
     title: 'Visão',

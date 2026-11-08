@@ -141,7 +141,7 @@ export async function planNotionSync(input: PlanInput): Promise<SyncPlan> {
       const id = newId();
       plan.taskCreates.push({
         id, ...nf, external_ref: ref, institution_id: null, is_demo: isDemo,
-        description: '', category: 'Geral', checklist: [], recurrence: 'nenhuma', is_mission: false, mission_date: null,
+        description: page.body ?? '', category: 'Geral', checklist: [], recurrence: 'nenhuma', is_mission: false, mission_date: null,
         completed_at: nf.status === 'concluida' ? now : null,
         history: [{ at: now, action: 'Sincronizada do Notion' }],
       });
@@ -161,6 +161,8 @@ export async function planNotionSync(input: PlanInput): Promise<SyncPlan> {
     const outcome = threeWay(baseHash, nHash, cHash);
     if (legacy && JSON.stringify(sortAttribution(localTask.attribution)) !== JSON.stringify(nf.attribution) && outcome !== 'notion')
       plan.taskUpdates.push({ id: localTask.id, patch: { attribution: nf.attribution } });
+    // Conteúdo da página: espelho Notion → Central (fora das três vias; na Central ele é somente leitura).
+    if (page.body !== undefined && page.body !== (localTask.description ?? '')) plan.taskUpdates.push({ id: localTask.id, patch: { description: page.body } });
     if (outcome === 'igual') {
       plan.counts.tarefas.sem_mudanca++;
       if (!st || st.synced_hash !== nHash || st.sync_status !== 'ok' || st.local_id !== localTask.id)
@@ -246,7 +248,9 @@ export async function planNotionSync(input: PlanInput): Promise<SyncPlan> {
       setState({ entity: 'krs', notion_page_id: pid, sync_status: 'revisao', last_notion_edited_time: page.last_edited_time });
       continue;
     }
-    const { fields: nf, objectiveIds, notion_progress } = mapped.fields;
+    const { fields: nf, objectiveIds, notion_progress, notes } = mapped.fields;
+    /** Espelho somente leitura (Descrição, Motivo e conteúdo da página): não entra nas três vias. */
+    const mirror = { description: notes.description, reason: notes.reason, ...(page.body !== undefined ? { notion_body: page.body } : {}) };
 
     // Qual Objetivo? Nunca escolhido em silêncio.
     let parent: string | null = null;
@@ -282,7 +286,7 @@ export async function planNotionSync(input: PlanInput): Promise<SyncPlan> {
         continue;
       }
       const br = breakerAllows('krs', pid, st); if (!br) continue;
-      const k: KeyResult = { id: newId(), ...nf, start: null, unit: '', external_ref: ref, notion_progress };
+      const k: KeyResult = { id: newId(), ...nf, start: null, unit: '', external_ref: ref, notion_progress, ...mirror };
       work.get(targetOid)!.krs.push(k); krLocation.set(ref, targetOid);
       setState({ ...base, ...br, local_id: k.id, local_parent_id: targetOid, synced_hash: nHash, synced_snapshot: nf, last_change_origin: 'notion', sync_status: 'ok' });
       plan.counts.krs.criados++;
@@ -297,6 +301,7 @@ export async function planNotionSync(input: PlanInput): Promise<SyncPlan> {
       plan.logs.push({ entity: 'krs', external_id: pid, action: 'atualizado', fields_changed: ['objetivo'] });
     }
     const krRef = work.get(targetOid)!.krs.find((x) => x.external_ref === ref)!;
+    for (const [key, val] of Object.entries(mirror) as [keyof typeof mirror, string | null][]) if ((krRef[key] ?? null) !== val) krRef[key] = val;
     const cf = krSyncFields(krRef); const cHash = await stateHash(cf);
     const outcome = threeWay(st?.synced_hash ?? null, nHash, cHash);
     const moved = found.oid !== targetOid;

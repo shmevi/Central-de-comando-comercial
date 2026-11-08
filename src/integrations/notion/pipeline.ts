@@ -26,7 +26,7 @@ export const fromDataSource = (p: NotionPage, dataSourceId: string) =>
  * Barreira 1 (filtro na origem) + busca dos itens já rastreados + Objetivos dos KRs do responsável.
  * A configuração deve ter sido validada (checkNotionConfig) antes de chamar.
  */
-export async function readNotion(adapter: NotionAdapter, config: NotionConfig, states: NotionSyncState[]): Promise<NotionRead> {
+export async function readNotion(adapter: NotionAdapter, config: NotionConfig, states: NotionSyncState[], opts: { bodies?: boolean } = {}): Promise<NotionRead> {
   const base = { personId: config.person_id, statusGroups: ACTIVE_STATUS_GROUPS };
   const tarefas = await queryAll(adapter, 'tarefas', { ...base, dataSourceId: config.tasks_data_source_id, personProperty: PROPS.tarefas.responsible, statusProperty: PROPS.tarefas.status });
   const krs = await queryAll(adapter, 'krs', { ...base, dataSourceId: config.krs_data_source_id, personProperty: PROPS.krs.responsible, statusProperty: PROPS.krs.status });
@@ -51,6 +51,21 @@ export async function readNotion(adapter: NotionAdapter, config: NotionConfig, s
     .filter((p) => fromDataSource(p, config.krs_data_source_id) && isOwnedBy(p, PROPS.krs.responsible, config.person_id))
     .flatMap((p) => relationOf(p.properties[PROPS.krs.objective])))];
   const objetivos = parentIds.length ? await adapter.retrieve('objetivos', parentIds) : [];
+
+  // Conteúdo das páginas: SÓ das tarefas e KRs do responsável (depois da barreira 2), nunca de páginas de outras pessoas.
+  if (opts.bodies && adapter.body) {
+    const mine = [
+      ...[...tarefas, ...xt.pages].filter((p) => !p.archived && fromDataSource(p, config.tasks_data_source_id) && isOwnedBy(p, PROPS.tarefas.responsible, config.person_id)),
+      ...allKrs.filter((p) => !p.archived && fromDataSource(p, config.krs_data_source_id) && isOwnedBy(p, PROPS.krs.responsible, config.person_id)),
+    ];
+    const queue = [...mine];
+    const worker = async () => {
+      for (let p = queue.shift(); p; p = queue.shift()) {
+        try { p.body = await adapter.body!(p.id); } catch { /* sem acesso ao conteúdo: a Central mantém o que já tinha */ }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]); // até 3 leituras ao mesmo tempo (limite da API do Notion)
+  }
 
   return {
     tarefas: [...tarefas, ...xt.pages], krs: allKrs, objetivos, missing: [...xt.missing, ...xk.missing],
@@ -122,7 +137,8 @@ export function minimizePage(p: NotionPage, entity: 'tarefas' | 'krs' | 'objetiv
   const properties: NotionPage['properties'] = {};
   for (const k of keys) if (p.properties[k] !== undefined) properties[k] = p.properties[k];
   if (entity !== 'objetivos') properties[PROPS[entity].responsible] = { type: 'people', ids: [normalizePageId(personId)] };
-  return { id: normalizePageId(p.id), url: p.url ?? null, last_edited_time: p.last_edited_time, parent_data_source_id: p.parent_data_source_id ?? null, archived: !!p.archived, properties };
+  return { id: normalizePageId(p.id), url: p.url ?? null, last_edited_time: p.last_edited_time, parent_data_source_id: p.parent_data_source_id ?? null, archived: !!p.archived, properties,
+    ...(p.body !== undefined && entity !== 'objetivos' ? { body: p.body } : {}) };
 }
 
 export function clientRead(read: NotionRead, config: NotionConfig): NotionRead {

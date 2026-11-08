@@ -26,7 +26,7 @@ function notionRead() {
     PRAZO: { type: 'date', start: due, end: null }, 'RESPONSÁVEL': people } });
   return { mode: 'read', gerado_em: EDIT, person_id: NP.person, read: {
     tarefas: [
-      task('e2e00000000000000000000000000101', 'Tarefa real do Notion (e2e)', 'Não iniciada', 'to_do', 'Importante e Urgente', '2026-11-10'),
+      { ...task('e2e00000000000000000000000000101', 'Tarefa real do Notion (e2e)', 'Não iniciada', 'to_do', 'Importante e Urgente', '2026-11-10'), body: 'Guru - itallo\nMensalidade - colegio' },
       task('e2e00000000000000000000000000102', 'Outra tarefa real (e2e)', 'Em andamento', 'in_progress', 'Importante e Não Urgente', null),
       { id: 'e2e00000000000000000000000000103', last_edited_time: EDIT, parent_data_source_id: NP.tasks, archived: false, properties: {} }, // de outra pessoa: esqueleto
     ],
@@ -186,6 +186,7 @@ async function handle(route) {
   ok((db.notion_sync_state || []).length >= 4 && (db.notion_sync_state || []).every((x) => !x.is_demo), 'estado de sincronização salvo (não demonstração)');
   await p.goto(BASE + '/tarefas?origem=notion'); await p.waitForSelector('text=Tarefa real do Notion (e2e)');
   ok(await p.locator('text=Outra tarefa real (e2e)').count() === 1, 'tarefas do Notion aparecem no filtro "Notion" das Tarefas');
+  ok((db.tasks || []).find((t) => t.external_ref === 'notion:e2e00000000000000000000000000101')?.description === 'Guru - itallo\nMensalidade - colegio', 'conteúdo da página do Notion gravado como descrição da tarefa');
   await p.goto(BASE + '/integracoes'); await p.waitForSelector('text=Leitura ativa');
   await p.click('button:has-text("Sincronizar (somente leitura)")');
   ok(await p.locator('text=Leitura concluída: 0 tarefa(s) e 0 KR(s)').waitFor({ timeout: 10000 }).then(() => true, () => false), 'segunda sincronização não duplica nada');

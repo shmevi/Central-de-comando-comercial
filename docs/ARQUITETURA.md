@@ -135,7 +135,10 @@ com a sessão do usuário (`sync.ts`). No modo local continua o adaptador de dem
 de escrita): exige `settings.notion_enabled` e `notion_write_enabled` (lidos com o JWT de quem chamou), valida em
 `pushCore.ts` (campos permitidos, página da base e do responsável, opções existentes, anti-sobrescrita contra a base) e faz
 `PATCH /pages/{id}` só com as propriedades alteradas. O navegador monta as pendências (`push.ts`) e só envia depois da
-confirmação na tela (`features/notion/PushPanel.tsx`). `dry_run: false` é recusado. Deploy:
+confirmação na tela (`features/notion/PushPanel.tsx`). Conteúdo das páginas: `blocks.ts` converte os blocos
+(`GET /blocks/{id}/children`, até 300 blocos e 2 níveis) em texto; `readNotion({ bodies: true })` só lê o conteúdo de
+páginas que passaram pela barreira 2; o plano espelha em `tasks.description` e em `description`/`reason`/`notion_body`
+do KR, fora das três vias (somente leitura na Central; nunca enviado ao Notion). `dry_run: false` é recusado. Deploy:
 `npm run build:edge` gera `supabase/functions/notion-sync/dist/index.js` (bundle único, sem dependências) para enviar
 ao Supabase.
 

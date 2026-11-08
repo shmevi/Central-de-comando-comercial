@@ -109,7 +109,7 @@ export async function handleNotionSync(req: Request, deps: HandlerDeps): Promise
       return json(200, { mode: 'push', gerado_em: now, results });
     }
     if (mode === 'read') {
-      const read = await readNotion(adapter, config, states);
+      const read = await readNotion(adapter, config, states, { bodies: true });
       return json(200, { mode: 'read', gerado_em: now, person_id: config.person_id, read: clientRead(read, config) });
     }
     let n = 0;

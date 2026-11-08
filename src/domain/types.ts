@@ -219,6 +219,10 @@ export interface KeyResult {
   period_end?: string | null;
   /** Progresso calculado pelo Notion (0–100). Somente leitura: nunca é escrito de volta. */
   notion_progress?: number | null;
+  /** Espelho do Notion (somente leitura na Central): propriedades "Descrição" e "Motivo:" e o conteúdo da página. */
+  description?: string | null;
+  reason?: string | null;
+  notion_body?: string | null;
 }
 
 export interface Objective extends BaseEntity {

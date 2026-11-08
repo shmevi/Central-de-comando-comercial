@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Pencil, Plus, Target, Trash2 } from 'lucide-react';
+import { FileText, Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { PageHeader, Loading, ErrorState, EmptyState, Card, Badge, DemoBadge, NotionBadge, Progress, Segmented, FilterBar } from '@/components/ui/misc';
@@ -142,6 +142,7 @@ function KrDialog({ card, onOpenChange, statusOnly }: { card: KrCard | null; onO
         </>}
         <SelectField className="sm:col-span-2" label={statusOnly != null ? 'Motivo (status no Notion)' : 'Status'} value={d.status ?? ''} onChange={(e) => set('status', e.target.value)} options={options} error={err.status} />
       </div>
+      {statusOnly == null && card.k.external_ref && <KrNotes k={card.k} />}
     </Dialog>
   );
 }
@@ -150,6 +151,24 @@ function KrDialog({ card, onOpenChange, statusOnly }: { card: KrCard | null; onO
  * Cartão como no Notion ("Kanban por Objetivo"): KR, Dono, Período, Progresso e Status.
  * No quadro por objetivo o status muda ali mesmo, pelo seletor (no Notion, editando a propriedade do cartão).
  */
+/** Descrição, Motivo e conteúdo da página do KR no Notion — somente leitura (edite no Notion). */
+function KrNotes({ k }: { k: KeyResult }) {
+  const parts = [['Descrição', k.description], ['Motivo', k.reason], ['Conteúdo da página', k.notion_body]] as const;
+  const any = parts.some(([, v]) => v && v.trim());
+  return (
+    <section className="mt-4 space-y-3 rounded-lg border border-border p-3" aria-label="Conteúdo do Notion">
+      <h3 className="flex items-center gap-2 text-sm font-semibold"><FileText size={14} aria-hidden />No Notion <span className="text-xs font-normal text-muted">(somente leitura — edite no Notion)</span></h3>
+      {!any && <p className="text-xs text-muted">{k.notion_body === undefined ? 'Sincronize de novo em Integrações para trazer a descrição e o conteúdo da página.' : 'Este KR não tem descrição, motivo nem conteúdo na página.'}</p>}
+      {parts.filter(([, v]) => v && v.trim()).map(([label, v]) => (
+        <div key={label}>
+          <div className="label mb-1">{label}</div>
+          <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface-2/60 p-2 text-sm">{v}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function KrCardView({ c, onEdit, showObjective, onStatus }: { c: KrCard; onEdit: () => void; showObjective?: boolean; onStatus?: (s: string) => void }) {
   const { k, o } = c;
   const kp = krProgress(k);
@@ -161,6 +180,7 @@ function KrCardView({ c, onEdit, showObjective, onStatus }: { c: KrCard; onEdit:
       {showObjective && <div className="truncate text-[11px] text-muted" title={o.title}>{o.title}</div>}
       <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted">
         {o.owner && <span className="chip border-border" title="Dono">{o.owner}</span>}
+        {(k.description || k.reason || k.notion_body) && <span className="chip border-border" title="Tem descrição/conteúdo no Notion — clique no KR para ler"><FileText size={11} aria-hidden />Descrição</span>}
         <span className="chip border-border" title="Período">{period(k) ?? 'Sem período'}</span>
         {k.external_ref && <NotionBadge />}{o.is_demo && <DemoBadge />}
       </div>
