@@ -5,7 +5,8 @@
 
 @layer base {
   html { -webkit-text-size-adjust: 100%; }
-  body { @apply bg-bg text-fg font-sans antialiased; margin: 0; overflow-x: hidden; font-feature-settings: 'cv11', 'ss01'; }
+  /* overflow-wrap: palavra longa (a Capture It é larga) quebra dentro da caixa em vez de vazar por cima do vizinho. */
+  body { @apply bg-bg text-fg font-sans antialiased; margin: 0; overflow-x: hidden; overflow-wrap: break-word; font-feature-settings: 'cv11', 'ss01'; }
   h1, h2, h3, h4 { @apply font-display font-bold tracking-wide; }
   h1 { @apply uppercase; }
   *:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; border-radius: 6px; }

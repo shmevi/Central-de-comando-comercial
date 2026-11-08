@@ -112,13 +112,14 @@ function DayView({ date, workday, nowTime, isToday }: { date: string; workday: W
           {day.map((b) => {
             const cur = isToday && toMin(b.start) <= toMin(nowTime) && toMin(nowTime) < toMin(b.end);
             return (
-              <li key={b.id} className={cn('card flex flex-wrap items-center gap-3 p-3', cur && 'border-gold-300 bg-gold-300/5', b.is_break && 'bg-surface-2/50')}>
-                <div className="w-28 shrink-0">
+              // Celular: horário | título, e os controles numa linha própria embaixo. A partir de 640px: tudo numa linha.
+              <li key={b.id} className={cn('card grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]', cur && 'border-gold-300 bg-gold-300/5', b.is_break && 'bg-surface-2/50')}>
+                <div className="w-[72px] shrink-0 self-start sm:w-28 sm:self-center">
                   <div className="font-mono text-sm">{b.start}–{b.end}</div>
                   <div className="text-xs text-muted">{fmtDuration(toMin(b.end) - toMin(b.start))}</div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 font-semibold">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 font-semibold [overflow-wrap:anywhere]">
                     {b.is_break && <Coffee size={14} className="text-orange" aria-hidden />}{b.title}
                     {cur && <span className="chip border-gold-300 text-gold">Agora</span>}
                     {conflicts.has(b.id) && <span className="chip border-danger/60 text-danger">Conflito de horário</span>}
@@ -126,8 +127,8 @@ function DayView({ date, workday, nowTime, isToday }: { date: string; workday: W
                   </div>
                   <div className="text-xs text-muted">{b.category}{b.notes && ` · ${b.notes}`}</div>
                 </div>
-                {b.is_break ? <span className="chip border-orange/50 text-orange"><Lock size={12} />Protegido</span> : (
-                  <div className="flex items-center gap-1">
+                {b.is_break ? <span className="chip col-start-2 justify-self-start border-orange/50 text-orange sm:col-start-3"><Lock size={12} />Protegido</span> : (
+                  <div className="col-start-2 flex items-center gap-1 sm:col-start-3">
                     <label><span className="sr-only">Status de {b.title}</span>
                       <select className={cn('field h-8 w-auto py-0 text-xs', BLOCK_STATUS[b.status].cls)} value={b.status} onChange={(e) => setStatus(b, e.target.value as BlockStatus)}>
                         {toOptions(Object.fromEntries(Object.entries(BLOCK_STATUS).map(([k, v]) => [k, v.label]))).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

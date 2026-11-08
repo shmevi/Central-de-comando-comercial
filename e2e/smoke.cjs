@@ -232,6 +232,26 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
       await p.goto(BASE + r); await p.waitForTimeout(400);
       const sw = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       ok(sw <= 0, `${vp.width}px ${r} sem rolagem horizontal (${sw})`);
+      // Nenhum texto visível por cima de botão/campo (ex.: título comprido invadindo o seletor de status)
+      const over = await p.evaluate(() => {
+        const out = [];
+        const vis = (el) => { const st = getComputedStyle(el); const rc = el.getBoundingClientRect(); return st.visibility !== 'hidden' && st.display !== 'none' && rc.width > 0 && rc.height > 0; };
+        const main = document.querySelector('main'); if (!main) return out;
+        const controls = [...main.querySelectorAll('select, button, input, textarea, a')].filter(vis);
+        const w = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+        for (let n = w.nextNode(); n; n = w.nextNode()) {
+          const el = n.parentElement;
+          if (!n.textContent.trim() || !el || !vis(el) || el.closest('.sr-only') || el.closest('select')) continue;
+          const range = document.createRange(); range.selectNodeContents(n);
+          for (const tr of range.getClientRects()) for (const c of controls) {
+            if (c.contains(n)) continue;
+            const cr = c.getBoundingClientRect();
+            if (Math.min(tr.right, cr.right) - Math.max(tr.left, cr.left) > 4 && Math.min(tr.bottom, cr.bottom) - Math.max(tr.top, cr.top) > 4) out.push(n.textContent.trim().slice(0, 30));
+          }
+        }
+        return [...new Set(out)];
+      });
+      ok(over.length === 0, `${vp.width}px ${r} sem texto sobreposto a botões/campos${over.length ? ` (${over.slice(0, 3).join(' | ')})` : ''}`);
       if (sw > 0) console.log(await p.evaluate(() => { const out = []; document.querySelectorAll('body *').forEach((e) => { const rc = e.getBoundingClientRect(); if (rc.right > innerWidth + 1) { let c = e, clipped = false; while ((c = c.parentElement)) { if (getComputedStyle(c).overflowX !== 'visible') { clipped = true; break; } } if (!clipped) out.push(`${e.tagName}.${String(e.className).slice(0, 60)} → ${Math.round(rc.right)}`); } }); return out.slice(0, 6); }));
     }
   }
