@@ -107,3 +107,30 @@ export function dryRunReport(read: NotionRead, plan: SyncPlan, config: NotionCon
     ignorados_fora_do_escopo: c.fora_do_escopo,
   };
 }
+
+/**
+ * Versão da leitura que o servidor devolve ao navegador (modo "read" da Edge Function). Minimiza o que sai:
+ * - Tarefas/KRs do responsável: só as propriedades que a integração usa; no campo de responsável fica só ele
+ *   (corresponsáveis não saem).
+ * - Páginas de outra pessoa, de outra base ou arquivadas: viram um "esqueleto" sem propriedades nem URL. O
+ *   planejador (barreira 2) só marca o estado delas — sem título nem conteúdo, que nunca saem do servidor.
+ * - Objetivos (só os ligados a KRs do responsável): só o título.
+ */
+export function clientRead(read: NotionRead, config: NotionConfig): NotionRead {
+  const pick = (p: NotionPage, keys: readonly string[], personProp?: string): NotionPage => {
+    const properties: NotionPage['properties'] = {};
+    for (const k of keys) if (p.properties[k] !== undefined) properties[k] = p.properties[k];
+    if (personProp) properties[personProp] = { type: 'people', ids: [normalizePageId(config.person_id)] };
+    return { id: normalizePageId(p.id), url: p.url ?? null, last_edited_time: p.last_edited_time, parent_data_source_id: p.parent_data_source_id ?? null, archived: !!p.archived, properties };
+  };
+  const skeleton = (p: NotionPage): NotionPage => ({ id: normalizePageId(p.id), last_edited_time: p.last_edited_time, parent_data_source_id: p.parent_data_source_id ?? null, archived: !!p.archived, properties: {} });
+  const side = (pages: NotionPage[], props: Record<string, string>, personProp: string, ds: string) => pages.map((p) =>
+    !p.archived && fromDataSource(p, ds) && isOwnedBy(p, personProp, config.person_id) ? pick(p, Object.values(props), personProp) : skeleton(p));
+  return {
+    tarefas: side(read.tarefas, PROPS.tarefas, PROPS.tarefas.responsible, config.tasks_data_source_id),
+    krs: side(read.krs, PROPS.krs, PROPS.krs.responsible, config.krs_data_source_id),
+    objetivos: read.objetivos.map((p) => (fromDataSource(p, config.objectives_data_source_id) ? pick(p, Object.values(PROPS.objetivos)) : skeleton(p))),
+    missing: read.missing.map(normalizePageId),
+    counts: read.counts,
+  };
+}

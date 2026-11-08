@@ -5,22 +5,40 @@
  */
 import { actions } from '@/data/store';
 import { repo } from '@/data';
-import type { KeyResult, NotionSyncState, Objective, ReviewQueueItem, Settings, Task } from '@/domain/types';
+import type { KeyResult, NotionConfig, NotionSyncState, Objective, ReviewQueueItem, Settings, Task } from '@/domain/types';
 import { nowIso, uid } from '@/lib/utils';
 import type { NotionAdapter } from './adapter';
-import { checkNotionConfig, describeConfigProblem, normalizePageId, resolveNotionConfig } from './config';
-import { readAndPlan } from './pipeline';
-import type { StatePatch, SyncPlan } from './plan';
+import { checkNotionConfig, describeConfigProblem, isNotionId, normalizePageId, resolveNotionConfig } from './config';
+import { readNotion, type NotionRead } from './pipeline';
+import { planNotionSync, type StatePatch, type SyncPlan } from './plan';
 
-export type SyncSummary = SyncPlan['counts'];
+export type SyncSummary = SyncPlan['counts'] & { person_id: string };
 
-export async function syncNotion(adapter: NotionAdapter, settings: Settings, saveSettings?: (patch: Partial<Settings>) => Promise<unknown>): Promise<SyncSummary> {
+/**
+ * De onde vem a leitura do Notion. Duas implementações:
+ * - demonstração (modo local): o adaptador fictício, lido aqui mesmo no navegador;
+ * - servidor (modo Supabase): a Edge Function notion-sync lê a API real com o token guardado lá e devolve só as
+ *   páginas do responsável vinculado à conta (o person_id do vínculo prevalece sobre o digitado).
+ */
+export interface NotionReader {
+  kind: NotionAdapter['kind'];
+  isDemo: boolean;
+  read(config: NotionConfig, states: NotionSyncState[]): Promise<{ read: NotionRead; person_id: string }>;
+}
+
+export const readerFromAdapter = (adapter: NotionAdapter): NotionReader => ({
+  kind: adapter.kind, isDemo: adapter.isDemo,
+  read: async (config, states) => ({ read: await readNotion(adapter, config, states), person_id: config.person_id }),
+});
+
+export async function syncNotion(source: NotionAdapter | NotionReader, settings: Settings, saveSettings?: (patch: Partial<Settings>) => Promise<unknown>): Promise<SyncSummary> {
+  const reader: NotionReader = 'query' in source ? readerFromAdapter(source) : source;
   const config = resolveNotionConfig(settings);
   // Fail-closed: sem todos os IDs obrigatórios não há consulta nenhuma (e nenhum valor padrão é usado).
   const check = checkNotionConfig(config);
   if (!check.ok) {
     const msg = `Configuração do Notion incompleta (${describeConfigProblem(check)}). Nada foi lido.`;
-    try { await actions.create('sync_logs', { source: 'notion', direction: 'leitura', entity: 'geral', status: 'erro', message: msg, is_demo_source: adapter.isDemo }); } catch { /* ignora */ }
+    try { await actions.create('sync_logs', { source: 'notion', direction: 'leitura', entity: 'geral', status: 'erro', message: msg, is_demo_source: reader.isDemo }); } catch { /* ignora */ }
     throw new Error(msg);
   }
   const startedAt = nowIso();
@@ -29,13 +47,21 @@ export async function syncNotion(adapter: NotionAdapter, settings: Settings, sav
       repo('tasks').list(), repo('objectives').list(), repo('notion_sync_state').list(), repo('review_queue').list(),
     ]);
     // Barreira 1 (filtro na origem), itens rastreados e Objetivos: ver pipeline.ts. Barreira 2: plan.ts.
-    const { plan } = await readAndPlan(adapter, config, { tasks, objectives, states, reviews }, { now: startedAt, newId: uid });
-    await applyPlan(plan, states, adapter.isDemo);
-    await saveSettings?.({ notion_config: { ...config, last_sync_at: startedAt } });
-    return plan.counts;
+    const got = await reader.read(config, states);
+    if (!isNotionId(got.person_id)) throw new Error('Resposta inválida da leitura do Notion (responsável ausente). Nada foi gravado.');
+    // Planeja com o responsável que a leitura usou de fato (no servidor, o do vínculo da conta).
+    const effective = { ...config, person_id: normalizePageId(got.person_id) };
+    const plan = await planNotionSync({
+      config: effective, isDemo: reader.isDemo, now: startedAt, newId: uid,
+      notion: { tarefas: got.read.tarefas, krs: got.read.krs, objetivos: got.read.objetivos }, missing: got.read.missing,
+      local: { tasks, objectives, states, reviews },
+    });
+    await applyPlan(plan, states, reader.isDemo);
+    await saveSettings?.({ notion_config: { ...effective, last_sync_at: startedAt } });
+    return { ...plan.counts, person_id: effective.person_id };
   } catch (e) {
     // O registro do erro não pode esconder o erro original (ex.: banco sem a migration 0002).
-    try { await actions.create('sync_logs', { source: 'notion', direction: 'leitura', entity: 'geral', status: 'erro', message: (e as Error).message, is_demo_source: adapter.isDemo }); } catch { /* ignora */ }
+    try { await actions.create('sync_logs', { source: 'notion', direction: 'leitura', entity: 'geral', status: 'erro', message: (e as Error).message, is_demo_source: reader.isDemo }); } catch { /* ignora */ }
     throw e;
   }
 }

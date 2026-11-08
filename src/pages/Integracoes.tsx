@@ -8,15 +8,23 @@ import { useConfirm } from '@/components/ui/dialog';
 import { Checkbox, SelectField, TextField } from '@/components/ui/form';
 import { useToast } from '@/components/ui/toast';
 import { MOCK_NOTION_CONFIG, mockNotionAdapter } from '@/integrations/notion/mockAdapter';
-import { chooseObjective, discardReview, resolveConflict, syncNotion } from '@/integrations/notion/sync';
+import { chooseObjective, discardReview, readerFromAdapter, resolveConflict, syncNotion, type NotionReader } from '@/integrations/notion/sync';
+import { createRemoteNotionReader } from '@/integrations/notion/remoteReader';
+import { DATA_MODE, supabase } from '@/data/supabaseClient';
 import { ACTIVE_STATUS_GROUPS, PROPS, REQUIRED_NOTION_FIELDS, TASK_PRIORITY_MAP, TASK_STATUS_MAP, checkNotionConfig, describeConfigProblem, isNotionId, normalizePageId, resolveNotionConfig } from '@/integrations/notion/config';
 import type { NotionConfig, ReviewKind, ReviewQueueItem } from '@/domain/types';
 import { PRIORITY, TASK_STATUS } from '@/domain/labels';
 import { fmtDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
-/** Adaptador em uso. Hoje só existe o de demonstração; o real (API do Notion, no servidor) é uma fase posterior. */
-const adapter = mockNotionAdapter;
+/**
+ * Leitura em uso:
+ * - modo Supabase: Notion REAL, lido no servidor (Edge Function notion-sync; o token fica só lá);
+ * - modo local (dados só no navegador): adaptador de DEMONSTRAÇÃO, com dados fictícios.
+ */
+const adapter: NotionReader = DATA_MODE === 'supabase'
+  ? createRemoteNotionReader((name, opts) => supabase().functions.invoke(name, opts))
+  : readerFromAdapter(mockNotionAdapter);
 
 const ENT_LABEL: Record<string, string> = { tarefas: 'Tarefas', krs: 'KRs', objetivos: 'Objetivos', okrs: 'OKRs (antigo)', reunioes: 'Reuniões (antigo)', geral: 'Geral' };
 const KIND_LABEL: Record<ReviewKind, string> = {
@@ -96,6 +104,7 @@ function NotionConfigForm({ cfg, onSave, demo }: { cfg: NotionConfig; onSave: (c
         {demo && <Button size="sm" variant="secondary" disabled={busy} onClick={() => save({ ...MOCK_NOTION_CONFIG, cursors: {}, last_sync_at: cfg.last_sync_at })}>Usar IDs de demonstração</Button>}
       </div>
       <p className="text-xs text-muted">Sem estes IDs a sincronização não roda. Eles ficam salvos nas suas configurações, não no código do app. O token do Notion nunca fica aqui.</p>
+      {!demo && <p className="text-xs text-muted">No Notion real, o responsável lido é sempre o vinculado à sua conta pelo administrador — por segurança, o ID digitado acima é substituído por ele na sincronização.</p>}
     </Card>
   );
 }
@@ -119,7 +128,10 @@ export default function Integracoes() {
   const others = pending.filter((q) => kindOf(q) !== 'conflito');
 
   async function toggleEnabled(v: boolean) {
-    if (v && !(await confirm({ title: 'Ativar leitura do Notion', message: 'Nesta fase o app usa um adaptador de DEMONSTRAÇÃO (dados fictícios). Nada será lido de um workspace real e nada será escrito. Ativar?', confirmLabel: 'Ativar leitura' }))) return;
+    const message = adapter.isDemo
+      ? 'Neste modo o app usa um adaptador de DEMONSTRAÇÃO (dados fictícios). Nada será lido de um workspace real e nada será escrito. Ativar?'
+      : `A Central vai LER do Notion as tarefas e os KRs ativos de ${who} e trazê-los para cá. Nada será escrito no Notion. Ativar?`;
+    if (v && !(await confirm({ title: 'Ativar leitura do Notion', message, confirmLabel: 'Ativar leitura' }))) return;
     await save({ notion_enabled: v, ...(v ? {} : { notion_write_enabled: false }) });
   }
   async function toggleWrite(v: boolean) {
@@ -154,7 +166,7 @@ export default function Integracoes() {
       {tab === 'conexao' && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="space-y-4 p-4">
-            <div className="flex items-center gap-3"><Plug className="text-gold" /><div><h2 className="font-sans text-base font-semibold tracking-normal">Notion</h2><p className="text-xs text-muted">Adaptador: {adapter.kind === 'mock' ? 'Demonstração (mock)' : adapter.kind.toUpperCase()}</p></div>
+            <div className="flex items-center gap-3"><Plug className="text-gold" /><div><h2 className="font-sans text-base font-semibold tracking-normal">Notion</h2><p className="text-xs text-muted">Origem: {adapter.kind === 'mock' ? 'Demonstração (dados fictícios)' : 'Notion real, lido pelo servidor (somente leitura)'}</p></div>
               <span className={cn('chip ml-auto', settings.notion_enabled ? 'border-success/60 text-success' : 'border-border text-muted')}>{settings.notion_enabled ? <><CheckCircle2 size={12} />Leitura ativa</> : <><XCircle size={12} />Desativado</>}</span></div>
             <Checkbox label="Ativar leitura (tarefas e OKRs)" checked={settings.notion_enabled} onChange={toggleEnabled} />
             <div className="rounded-lg border border-border p-3">
@@ -176,6 +188,7 @@ export default function Integracoes() {
               <li>Itens do Notion são pessoais (sem instituição) e aparecem em qualquer filtro de instituição.</li>
               <li>Valor fora do mapeamento, KR sem Objetivo ou com vários Objetivos vão para a revisão — nada é adivinhado.</li>
               <li>Se o mesmo item mudou no Notion e na Central, nada é sobrescrito: vira um conflito para você decidir.</li>
+              <li>A Central só lê o Notion. Mudanças feitas aqui não voltam para o Notion nesta versão.</li>
             </ol>
           </Card>
         </div>

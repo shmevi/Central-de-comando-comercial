@@ -41,13 +41,13 @@ Lucide · Recharts · jsPDF (PDF) · Supabase JS · fontes Inter e Barlow Conden
 | `/okrs` | OKRs | objetivos por instituição e ciclo; progresso só com meta válida |
 | `/projetos` | Projetos | etapas, entregas, responsáveis, dependências; "em andamento" exige confirmação |
 | `/relatorios` | Relatórios | diário/semanal, CSV e PDF, "Não preenchido" ≠ zero |
-| `/integracoes` | Integrações | Notion (adaptador de demonstração), mapeamento de campos, fila de revisão, log |
+| `/integracoes` | Integrações | Notion (real no modo Supabase; demonstração no modo local), mapeamento de campos, fila de revisão, log |
 | `/configuracoes` | Configurações | perfil, tema, jornada, instituições, foco semanal, categorias, modelo de rotina, permissões, dados |
 
 ## Modelo de dados
 
 Todas as tabelas têm `id`, `user_id`, `created_at`, `updated_at`, `is_demo`, `external_ref`.
-Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/` (0001 base, 0002 Notion, 0003 relatórios/logo).
+Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/` (0001 base, 0002 Notion, 0003 relatórios/logo, 0004 logo 5 MB, 0005 vínculo Notion).
 
 > **Recrutamento** e **Sistemas e Melhorias** foram retirados da interface (menu, rotas e telas). As tabelas
 > `candidates`, `interviews`, `systems` e `improvements` **continuam no banco com os dados intactos** e entram no backup.
@@ -124,12 +124,18 @@ item que sumiu do Notion não é apagado na Central. (7) KRs são agrupados pelo
 Objetivo é somente leitura na Central porque a página é compartilhada.
 
 Servidor: Edge Function `supabase/functions/notion-sync` (lógica em `serverHandler.ts`, adaptador da API oficial em
-`apiAdapter.ts` — nenhum dos dois é importado por tela, então não vão para o navegador). Esta versão é **só dry-run**:
-lê o Notion com o token do Edge Secret `NOTION_TOKEN`, lê a Central com o JWT de quem chamou (RLS), calcula o plano e
-devolve contagens e IDs de página — sem gravar em lugar nenhum; `dry_run: false` é recusado. Deploy:
+`apiAdapter.ts` — nenhum dos dois é importado por tela, então não vão para o navegador). Lê o Notion com o token do
+Edge Secret `NOTION_TOKEN` e a Central com o JWT de quem chamou (RLS). Só atende quem tem vínculo em
+`public.notion_access` (conta ↔ pessoa no Notion, criado pelo administrador) e usa **sempre** o `person_id` desse
+vínculo — o ID digitado nas Configurações não permite ler outra pessoa. Modos (ambos somente leitura do Notion):
+`dry_run` (padrão; contagens e IDs) e `read` (páginas do responsável, minimizadas por `clientRead`: só as propriedades
+usadas, sem corresponsáveis; páginas de outra pessoa viram esqueleto sem dados). No modo Supabase, o botão
+"Sincronizar" da tela Integrações chama o modo `read` (`remoteReader.ts`) e o navegador planeja e grava **na Central**
+com a sessão do usuário (`sync.ts`). No modo local continua o adaptador de demonstração. `dry_run: false` é recusado. Deploy:
 `npm run build:edge` gera `supabase/functions/notion-sync/dist/index.js` (bundle único, sem dependências) para enviar
 ao Supabase.
 
 Banco: migration `0002_notion_sync.sql` (`notion_sync_state`, unicidade de `external_ref`, `review_queue.kind`,
 `sync_logs.external_id/fields_changed`, `settings.notion_config`). O token do Notion **nunca** fica no banco nem no
-frontend. A escrita (Central → Notion) e o adaptador real (API do Notion num componente servidor) são fases posteriores.
+frontend. Migration `0005_notion_access.sql`: tabela de vínculo (o usuário só lê a própria linha; não cria nem altera).
+A escrita (Central → Notion) é fase posterior e exigirá ativação e confirmação explícitas.

@@ -20,11 +20,13 @@
     o app inteiro roda no navegador em modo Supabase contra um Supabase **simulado** (`npm run test:supabase`).
     Ainda **não** rodou contra um projeto Supabase de verdade, porque nenhum foi criado ou conectado.
 
+- **Integração Notion (modo Supabase)**: leitura REAL Notion → Central de Tarefas e KRs/OKRs ativos do responsável,
+  pela Edge Function `notion-sync` (token só no servidor). Só para contas com vínculo em `notion_access`. Duas barreiras
+  de responsável, deduplicação, três vias/conflitos, agrupamento de KRs por Objetivo. **Nada é escrito no Notion.**
+
 ## Demonstração (fictício, sempre identificado)
-- **Integração Notion**: lógica completa de leitura Notion → Central (filtro pelo responsável em duas barreiras,
-  mapeamentos, deduplicação, conflitos, agrupamento de KRs) rodando sobre um adaptador *mock*. Nenhum workspace real é
-  acessado e não existe escrita. Itens importados recebem o selo "Demonstração". A migration `0002_notion_sync.sql`
-  existe no repositório mas **não foi aplicada** em nenhum Supabase.
+- **Integração Notion no modo local**: a mesma lógica roda sobre um adaptador *mock*; itens recebem o selo "Demonstração".
+  No modo Supabase a leitura é **real** (ver "Funcional").
 - **"Carregar demonstração"** (Configurações): pessoas, feedback, candidatos, OKR e sistema fictícios com selo
   "Demonstração", removíveis com um clique. Por padrão o app inicia **sem** dados fictícios.
 
@@ -38,7 +40,7 @@
 - Cada pessoa que entra tem o próprio espaço de dados. Não há tela para administrar usuários dentro do app:
   usuários são criados e removidos no painel do Supabase (Authentication → Users).
 - Arrastar e soltar nos Kanbans usa HTML5 drag (desktop); no celular e por teclado use o seletor "Mover".
-- Adaptador Notion real: implementar `NotionAdapter` (somente leitura) num componente servidor com a API do Notion,
-  convertendo a fórmula `Progresso` para 0–100 (o formato real da fórmula ainda não foi verificado — a leitura via MCP não devolve o valor).
+- Notion: a escrita Central → Notion ainda não existe (mudanças feitas na Central ficam "pendentes de envio").
+  A fórmula `Progresso` só é convertida para 0–100 quando confere com Meta/Atual; senão o progresso é calculado na Central.
 - Os arquivos anexos citados no pedido (`prompt-central-comando-comercial.md` e `0001_central_comando.sql`) não
   estavam no repositório; o esquema foi escrito a partir do texto do pedido. Se houver diferenças, posso conciliar.

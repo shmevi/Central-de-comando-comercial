@@ -15,7 +15,28 @@ const session = (email) => ({ access_token: tokenFor(email), token_type: 'bearer
   user: { id: USERS[email].id, aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() } });
 
 /** PostgREST em memória: cada linha guarda user_id; o "RLS" filtra pelo usuário do token. */
-const db = {}; const calls = []; const storage = new Map();
+const db = {}; const calls = []; const storage = new Map(); const fnCalls = [];
+const NP = { person: 'e2e00000000000000000000000000001', tasks: 'e2e0db00000000000000000000000001', krs: 'e2e0db00000000000000000000000002', objs: 'e2e0db00000000000000000000000003' };
+const EDIT = '2026-11-07T12:00:00.000Z';
+function notionRead() {
+  const people = { type: 'people', ids: [NP.person] };
+  const task = (id, title, status, group, prio, due) => ({ id, last_edited_time: EDIT, parent_data_source_id: NP.tasks, archived: false, properties: {
+    TAREFA: { type: 'title', text: title }, STATUS: { type: 'status', name: status, group }, PRIORIDADE: { type: 'select', name: prio },
+    PRAZO: { type: 'date', start: due, end: null }, 'RESPONSÁVEL': people } });
+  return { mode: 'read', gerado_em: EDIT, person_id: NP.person, read: {
+    tarefas: [
+      task('e2e00000000000000000000000000101', 'Tarefa real do Notion (e2e)', 'Não iniciada', 'to_do', 'Importante e Urgente', '2026-11-10'),
+      task('e2e00000000000000000000000000102', 'Outra tarefa real (e2e)', 'Em andamento', 'in_progress', 'Importante e Não Urgente', null),
+      { id: 'e2e00000000000000000000000000103', last_edited_time: EDIT, parent_data_source_id: NP.tasks, archived: false, properties: {} }, // de outra pessoa: esqueleto
+    ],
+    krs: [{ id: 'e2e00000000000000000000000000201', last_edited_time: EDIT, parent_data_source_id: NP.krs, archived: false, properties: {
+      'Resultado Chave (KR)': { type: 'title', text: 'KR real do Notion (e2e)' }, Dono: people, 'Objetivo (O)': { type: 'relation', ids: ['e2e00000000000000000000000000301'] },
+      Status: { type: 'status', name: 'A caminho', group: 'to_do' }, Meta: { type: 'number', value: 10 }, Atual: { type: 'number', value: 4 },
+      'Período': { type: 'date', start: '2026-10-01', end: '2026-12-31' }, Progresso: { type: 'formula', value: 40 } } }],
+    objetivos: [{ id: 'e2e00000000000000000000000000301', last_edited_time: EDIT, parent_data_source_id: NP.objs, archived: false, properties: { 'Visão': { type: 'title', text: 'Objetivo real do Notion (e2e)' } } }],
+    missing: [], counts: { tarefas: { consulta: 3, rastreadas: 0 }, krs: { consulta: 1, rastreadas: 0 }, objetivos: 1 },
+  } };
+}
 function userFromAuth(h) { try { return JSON.parse(Buffer.from(h.split(' ')[1].split('.')[1], 'base64url').toString()).sub; } catch { return null; } }
 async function handle(route) {
   const req = route.request(); const url = new URL(req.url()); const method = req.method();
@@ -43,6 +64,13 @@ async function handle(route) {
     if (!path.startsWith(uidS + '/')) return json(400, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' });
     if (method === 'POST' || method === 'PUT') { storage.set(path, req.postDataBuffer()); return json(200, { Key: `branding/${path}` }); }
     if (method === 'GET') { const buf = storage.get(path); return buf ? route.fulfill({ status: 200, contentType: 'image/png', body: buf }) : json(400, { statusCode: '404', error: 'not_found', message: 'Object not found' }); }
+  }
+  // Edge Function notion-sync simulada (modo "read"): só para quem tem vínculo; páginas fictícias de e2e.
+  if (url.pathname === '/functions/v1/notion-sync') {
+    const uidF = userFromAuth(req.headers()['authorization'] || '');
+    fnCalls.push({ uid: uidF, body: JSON.parse(req.postData() || '{}') });
+    if (uidF !== USERS['coord@cppem.com.br'].id) return json(403, { error: 'Esta conta ainda não está liberada para ler o Notion. Peça ao administrador para criar o vínculo (tabela notion_access). Nada foi lido.' });
+    return json(200, notionRead());
   }
   const m = /^\/rest\/v1\/([a-z_]+)$/.exec(url.pathname);
   if (!m) return json(404, { message: 'not found' });
@@ -122,6 +150,36 @@ async function handle(route) {
   await p.waitForSelector('li:has-text("Conquista no Supabase")');
   ok((db.report_entries || []).some((e) => e.text === 'Conquista no Supabase' && e.user_id === uidA && e.kind === 'conquista'), 'conquista salva em report_entries no Supabase');
 
+  // Notion REAL (modo Supabase): configurar, ativar e sincronizar pela Edge Function — sem banner de demonstração
+  await p.goto(BASE + '/integracoes'); await p.waitForSelector('text=Notion real, lido pelo servidor');
+  ok(await p.locator('text=Modo demonstração.').count() === 0, 'Integrações no modo Supabase não usa o adaptador de demonstração');
+  await p.click('role=radio[name="Campos"]');
+  const fill = (label, v) => p.fill(`label:has-text("${label}") >> xpath=following-sibling::input`, v);
+  await fill('ID do usuário responsável no Notion', NP.person); await fill('Data source de Tarefas', NP.tasks);
+  await fill('Data source de KRs', NP.krs); await fill('Data source de Objetivos', NP.objs);
+  ok(await p.locator('button:has-text("Usar IDs de demonstração")').count() === 0, 'sem botão de IDs de demonstração no Notion real');
+  await p.click('button:has-text("Salvar configuração")'); await p.waitForSelector('text=Configuração salva.');
+  await p.click('role=radio[name="Conexão"]');
+  await p.click('label:has-text("Ativar leitura (tarefas e OKRs)") >> input');
+  await p.click('role=dialog >> button:has-text("Ativar leitura")');
+  await p.waitForSelector('text=Leitura ativa');
+  await p.click('button:has-text("Sincronizar (somente leitura)")');
+  ok(await p.locator('text=Leitura concluída: 2 tarefa(s) e 1 KR(s)').waitFor({ timeout: 10000 }).then(() => true, () => false), 'sincronização real importa 2 tarefas e 1 KR');
+  ok(fnCalls.length === 1 && fnCalls[0].uid === uidA && JSON.stringify(fnCalls[0].body) === '{"mode":"read"}', 'Edge Function chamada com a sessão do usuário e só no modo leitura');
+  const nt = (db.tasks || []).filter((t) => (t.external_ref || '').startsWith('notion:'));
+  ok(nt.length === 2 && nt.every((t) => t.user_id === uidA && t.institution_id === null && !t.is_demo), 'tarefas do Notion gravadas no banco do usuário, sem instituição e NÃO como demonstração');
+  const no = (db.objectives || []).find((o) => o.external_ref === 'notion:e2e00000000000000000000000000301');
+  ok(!!no && no.key_results.length === 1 && no.key_results[0].title === 'KR real do Notion (e2e)' && !no.is_demo, 'OKR do Notion: Objetivo com o KR agrupado');
+  ok(!(db.tasks || []).some((t) => t.external_ref === 'notion:e2e00000000000000000000000000103'), 'página de outra pessoa não vira tarefa');
+  ok((db.notion_sync_state || []).length >= 4 && (db.notion_sync_state || []).every((x) => !x.is_demo), 'estado de sincronização salvo (não demonstração)');
+  await p.goto(BASE + '/tarefas?origem=notion'); await p.waitForSelector('text=Tarefa real do Notion (e2e)');
+  ok(await p.locator('text=Outra tarefa real (e2e)').count() === 1, 'tarefas do Notion aparecem no filtro "Notion" das Tarefas');
+  await p.goto(BASE + '/integracoes'); await p.waitForSelector('text=Leitura ativa');
+  await p.click('button:has-text("Sincronizar (somente leitura)")');
+  ok(await p.locator('text=Leitura concluída: 0 tarefa(s) e 0 KR(s)').waitFor({ timeout: 10000 }).then(() => true, () => false), 'segunda sincronização não duplica nada');
+  ok((db.tasks || []).filter((t) => (t.external_ref || '').startsWith('notion:')).length === 2, 'continua com 2 tarefas do Notion no banco');
+  await p.goto(BASE + '/'); await p.waitForSelector('text=Missão do dia');
+
   // sessão persiste entre recargas; sair volta para o login
   await p.click('button:has-text("Sair")'); await p.waitForSelector('text=Entre para continuar');
   ok(true, 'sair volta para a tela de login');
@@ -134,6 +192,8 @@ async function handle(route) {
   ok(await p.locator('aside img[alt="Logo da Central"]').count() === 0, 'segundo usuário não herda a logo do primeiro');
   await p.goto(BASE + '/relatorios'); await p.waitForSelector('text=Tarefas concluídas');
   ok(await p.locator('text=Conquista no Supabase').count() === 0, 'segundo usuário não vê conquistas do primeiro');
+  await p.goto(BASE + '/tarefas?origem=notion'); await p.waitForTimeout(500);
+  ok(await p.locator('text=Tarefa real do Notion (e2e)').count() === 0, 'segundo usuário não vê as tarefas do Notion do primeiro');
 
   // link de recuperação de senha do e-mail → tela "Defina sua senha" → app
   await p.click('button:has-text("Sair")'); await p.waitForSelector('text=Entre para continuar');

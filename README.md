@@ -63,6 +63,8 @@ Nenhum projeto Supabase foi criado ou conectado por este repositório. Siga na o
    - `0003_relatorios_e_logo.sql` — conquistas/anotações dos relatórios (`report_entries`), coluna `settings.logo_path`
      e o bucket privado **branding** do Storage (logo personalizada), com regras por usuário. Não apaga nada; pode ser reaplicada.
    - `0004_logo_5mb.sql` — aumenta o limite da logo no bucket `branding` para 5 MB (só um UPDATE).
+   - `0005_notion_access.sql` — vínculo conta ↔ pessoa no Notion (quem pode ler o Notion pela Central). Depois de aplicar,
+     libere cada conta no SQL Editor: `insert into public.notion_access (user_id, person_id) select id, '<id-no-notion>' from auth.users where email = '<e-mail>';`
 3. **Fechar o cadastro público** — **Authentication → Sign In / Providers** → desligue **Allow new users to sign up**.
    Deixe **Email** ligado e **Confirm email** ligado.
 4. **Criar o seu usuário** — **Authentication → Users → Add user → Create new user**: e-mail, senha forte e marque
@@ -109,7 +111,7 @@ iniciais (04, 05 e 06/11/2026). Se você já usava o modo local: **Configuraçõ
 - Acesso anônimo (sem login) revogado em todas as tabelas.
 - Cabeçalhos de produção: `Content-Security-Policy` (só o próprio site e `*.supabase.co`), sem iframes de terceiros,
   `nosniff`, HSTS. Fontes embutidas no app (nenhuma chamada ao Google Fonts).
-- Convites de WhatsApp só são copiados; nada é enviado automaticamente. Notion em modo demonstração, somente leitura.
+- Notion: somente leitura, pelo servidor (token só no Edge Secret `NOTION_TOKEN`), apenas para contas vinculadas em `notion_access`. Nada é escrito no Notion.
 
 ## Estrutura
 
@@ -126,7 +128,7 @@ src/
   integrations/   Notion: contrato do adaptador, adaptador de demonstração, sincronização
   lib/            datas/fuso, jornada, conflitos, OKR, PIN, convite WhatsApp
   pages/          uma tela por módulo
-supabase/         migrations 0001–0003 (esquema, Notion, relatórios/logo + RLS e Storage) e testes de RLS
+supabase/         migrations 0001–0005 (esquema, Notion, relatórios/logo, vínculo Notion + RLS e Storage), Edge Function notion-sync e testes de RLS
 e2e/              testes no navegador e servidor que imita a hospedagem
 scripts/          gerador de vercel.json / netlify.toml
 docs/             arquitetura, checklist de testes, status funcional

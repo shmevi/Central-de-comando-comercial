@@ -17,8 +17,10 @@ for f in "$ROOT"/supabase/migrations/*.sql; do $P -f "$f"; done
 $P -f "$ROOT/supabase/tests/rls_test.sql"
 $P -f "$ROOT/supabase/tests/notion_sync_test.sql"
 $P -f "$ROOT/supabase/tests/report_logo_test.sql"
+$P -f "$ROOT/supabase/tests/notion_access_test.sql"
 # A 0002 precisa poder ser reaplicada num banco de teste sem erro
 $P -f "$ROOT/supabase/migrations/0002_notion_sync.sql"
 # A 0003 também (não destrutiva, idempotente)
 $P -f "$ROOT/supabase/migrations/0003_relatorios_e_logo.sql"
 $P -f "$ROOT/supabase/migrations/0004_logo_5mb.sql"
+$P -f "$ROOT/supabase/migrations/0005_notion_access.sql"

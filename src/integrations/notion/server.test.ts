@@ -4,6 +4,8 @@ import { createNotionApiAdapter, normalizeProgress, statusGroupOf, toUuid } from
 import { PROPS } from './config';
 import { createMockNotionAdapter, MOCK_IDS as I, MOCK_NOTION_CONFIG as CFG } from './mockAdapter';
 import { handleNotionSync } from './serverHandler';
+import { planNotionSync } from './plan';
+import { createRemoteNotionReader, type InvokeFn } from './remoteReader';
 
 const TOKEN = 'token-de-teste-falso-nao-e-credencial';
 const PERSON = CFG.person_id;
@@ -123,16 +125,19 @@ describe('API do Notion (adaptador do servidor)', () => {
   });
 });
 
-describe('Edge Function notion-sync (dry-run)', () => {
+describe('Edge Function notion-sync', () => {
   const REST = 'https://exemplo.supabase.co';
   const JWT = 'Bearer eyJ.usuario.teste';
-  function central(opts: { config?: Record<string, unknown> } = {}) {
+  function central(opts: { config?: Record<string, unknown>; access?: string | null; states?: unknown[] } = {}) {
     const calls: { url: string; auth: string }[] = [];
     const f = (async (url: string, init: RequestInit = {}) => {
       const h = init.headers as Record<string, string>;
       calls.push({ url, auth: h.Authorization });
       const table = new URL(url).pathname.split('/').pop();
-      const rows = table === 'settings' ? [{ id: 's', notion_config: opts.config ?? CFG }] : [];
+      const access = opts.access === undefined ? PERSON : opts.access;
+      const rows = table === 'settings' ? [{ id: 's', notion_config: opts.config ?? CFG }]
+        : table === 'notion_access' ? (access ? [{ user_id: 'u1', person_id: access }] : [])
+        : table === 'notion_sync_state' ? (opts.states ?? []) : [];
       return new Response(JSON.stringify(rows), { status: 200 });
     }) as unknown as typeof fetch;
     return { f, calls };
@@ -179,6 +184,97 @@ describe('Edge Function notion-sync (dry-run)', () => {
     expect(report.objetivos).toMatchObject({ agrupando_krs: 2, criar: 2 });
     expect(text).not.toContain(I.t_so_outra);
     expect(text).not.toContain(I.k_so_outra);
+  });
+  it('sem vínculo em notion_access: 403 e nenhuma chamada ao Notion', async () => {
+    const { f } = central({ access: null });
+    let notionCalls = 0;
+    for (const body of [{}, { mode: 'read' }]) {
+      const r = await handleNotionSync(post(body), { env: env({ SUPABASE_URL: REST, NOTION_TOKEN: TOKEN }), fetch: f, makeAdapter: () => { notionCalls++; return createMockNotionAdapter(); } });
+      expect(r.status).toBe(403);
+    }
+    expect(notionCalls).toBe(0);
+    expect((await handleNotionSync(post({ mode: 'escrever' }), { env: env({ SUPABASE_URL: REST, NOTION_TOKEN: TOKEN }), fetch: f })).status).toBe(400);
+  });
+  it('o responsável é sempre o do vínculo: trocar o ID nas Configurações não lê tarefas de outra pessoa', async () => {
+    const { f } = central({ config: { ...CFG, person_id: OTHER } }); // usuário digitou o ID de outra pessoa
+    const queried: string[] = [];
+    const base = createMockNotionAdapter();
+    const r = await handleNotionSync(post({ mode: 'read' }), {
+      env: env({ SUPABASE_URL: REST, NOTION_TOKEN: TOKEN }), fetch: f,
+      makeAdapter: () => ({ ...base, query: (src, q) => { queried.push(q.personId); return base.query(src, q); } }),
+    });
+    expect(r.status).toBe(200);
+    expect(queried.length).toBeGreaterThan(0);
+    expect(queried.every((p) => p === PERSON)).toBe(true);
+    const { person_id, read } = await r.json();
+    expect(person_id).toBe(PERSON);
+    expect(read.tarefas.map((p: any) => p.id)).not.toContain(I.t_so_outra);
+  });
+  it('modo read: devolve só o que é do responsável, minimizado; o resto vira esqueleto sem dados', async () => {
+    const { f } = central({ states: [{ id: 'x', entity: 'tarefas', notion_page_id: 'de3000000000000000000000000fake01', local_id: 'l', sync_status: 'ok', is_demo: true }] });
+    const retrieved: string[][] = [];
+    const base = createMockNotionAdapter({ leaky: true });
+    const r = await handleNotionSync(post({ mode: 'read' }), {
+      env: env({ SUPABASE_URL: REST, NOTION_TOKEN: TOKEN }), fetch: f, now: () => '2026-11-07T15:00:00.000Z',
+      makeAdapter: () => ({ ...base, retrieve: (src, ids) => { retrieved.push(ids); return base.retrieve(src, ids); } }),
+    });
+    expect(r.status).toBe(200);
+    const text = await r.text();
+    expect(text).not.toContain(TOKEN);
+    expect(text).not.toContain('Tarefa de outra pessoa');
+    expect(text).not.toContain('KR de outra pessoa');
+    expect(text).not.toContain('Tarefa sem responsável');
+    expect(text).not.toContain(OTHER); // corresponsáveis não saem
+    expect(retrieved.flat()).not.toContain('de3000000000000000000000000fake01'); // estado de demonstração não é buscado
+    const { mode, read } = JSON.parse(text);
+    expect(mode).toBe('read');
+    const outra = read.tarefas.find((p: any) => p.id === I.t_so_outra);
+    expect(outra).toEqual({ id: I.t_so_outra, last_edited_time: expect.any(String), parent_data_source_id: CFG.tasks_data_source_id, archived: false, properties: {} });
+    const minha = read.tarefas.find((p: any) => p.id === I.t_responsavel_e_outra);
+    expect(minha.properties[PROPS.tarefas.responsible]).toEqual({ type: 'people', ids: [PERSON] });
+    expect(minha.properties[PROPS.tarefas.title].text).toContain('Atualizar playbook');
+    // O navegador planeja com o que recebeu e chega ao mesmo resultado do dry-run (a barreira 2 continua valendo).
+    let n = 0;
+    const plan = await planNotionSync({ config: { ...CFG, person_id: PERSON }, notion: read, missing: read.missing, local: { tasks: [], objectives: [], states: [], reviews: [] }, isDemo: false, now: '2026-11-07T15:00:00.000Z', newId: () => `id-${++n}` });
+    expect(plan.taskCreates.map((t) => t.external_ref).sort()).toEqual([I.t_responsavel, I.t_responsavel_e_outra, I.t_pausada, I.t_concluida].map((x) => `notion:${x}`).sort());
+    expect(plan.taskCreates.every((t) => t.institution_id === null && !t.is_demo)).toBe(true);
+    expect(plan.counts.fora_do_escopo).toBeGreaterThanOrEqual(3);
+    expect(plan.objectiveCreates).toHaveLength(2);
+  });
+});
+
+describe('Leitura real pelo navegador (chama a Edge Function)', () => {
+  const REST = 'https://exemplo.supabase.co';
+  /** Imita supabase.functions.invoke: 2xx → data; senão → error com a Response em `context`. */
+  const invokeVia = (handler: (req: Request) => Promise<Response>): InvokeFn => async (name, opts) => {
+    const res = await handler(new Request(`${REST}/functions/v1/${name}`, { method: 'POST', headers: { Authorization: 'Bearer eyJ.u.t', apikey: 'sb_publishable_teste' }, body: JSON.stringify(opts.body) }));
+    return res.ok ? { data: await res.json(), error: null } : { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: res }) };
+  };
+  const centralFetch = (access: string | null) => (async (url: string) => {
+    const table = new URL(url).pathname.split('/').pop();
+    const rows = table === 'settings' ? [{ id: 's', notion_config: CFG }] : table === 'notion_access' ? (access ? [{ user_id: 'u', person_id: access }] : []) : [];
+    return new Response(JSON.stringify(rows), { status: 200 });
+  }) as unknown as typeof fetch;
+  const deps = (access: string | null) => ({ env: (k: string) => ({ SUPABASE_URL: REST, NOTION_TOKEN: TOKEN } as Record<string, string>)[k], fetch: centralFetch(access), makeAdapter: () => createMockNotionAdapter() });
+
+  it('pede só o modo "read" e devolve as páginas do responsável, marcadas como NÃO demonstração', async () => {
+    const bodies: unknown[] = [];
+    const reader = createRemoteNotionReader(async (n, o) => { bodies.push(o.body); return invokeVia((r) => handleNotionSync(r, deps(PERSON)))(n, o); });
+    expect(reader.isDemo).toBe(false);
+    const got = await reader.read(CFG, []);
+    expect(bodies).toEqual([{ mode: 'read' }]);
+    expect(got.person_id).toBe(PERSON);
+    expect(got.read.tarefas.map((p) => p.id).sort()).toEqual([I.t_responsavel, I.t_responsavel_e_outra, I.t_status_desconhecido, I.t_prioridade_desconhecida, I.t_pausada].sort());
+  });
+  it('erro do servidor chega com a mensagem dele (ex.: conta sem vínculo)', async () => {
+    const reader = createRemoteNotionReader(invokeVia((r) => handleNotionSync(r, deps(null))));
+    await expect(reader.read(CFG, [])).rejects.toThrow(/não está liberada/);
+  });
+  it('resposta fora do formato é recusada (nada é gravado)', async () => {
+    const reader = createRemoteNotionReader(async () => ({ data: { mode: 'dry_run', report: {} }, error: null }));
+    await expect(reader.read(CFG, [])).rejects.toThrow(/Resposta inesperada/);
+    const offline = createRemoteNotionReader(async () => ({ data: null, error: new Error('Failed to send a request to the Edge Function') }));
+    await expect(offline.read(CFG, [])).rejects.toThrow(/Não foi possível falar com o servidor/);
   });
 });
 
