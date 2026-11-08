@@ -91,8 +91,9 @@ grant select, insert, update, delete on public.notion_sync_state to authenticate
 -- 3. Fila de revisão: tipos de motivo e reentrada do mesmo item
 -- ---------------------------------------------------------------------
 -- Registros antigos (criados pela integração de demonstração) recebem o tipo legado 'instituicao'.
+-- O default é MANTIDO: o código antigo em Production insere sem informar kind e continua funcionando.
+-- A integração nova sempre informa kind explicitamente.
 alter table public.review_queue add column if not exists kind text not null default 'instituicao';
-alter table public.review_queue alter column kind drop default;
 alter table public.review_queue drop constraint if exists review_queue_kind_check;
 alter table public.review_queue add constraint review_queue_kind_check check (kind in (
   'conflito', 'kr_multiplos_objetivos', 'kr_sem_objetivo', 'valor_desconhecido',
