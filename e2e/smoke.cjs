@@ -200,6 +200,11 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   await p.goto(BASE + '/relatorios'); await p.waitForTimeout(500);
   ok(await p.locator('h1:has-text("Relatórios")').count() === 1, 'abrir /relatorios direto funciona (sem 404)');
 
+  // Fonte de identidade "Capture It" carregada (embutida, servida pelo próprio site) e marca sem corte
+  await p.setViewportSize({ width: 1366, height: 900 }); await p.goto(BASE); await p.waitForSelector('text=Missão do dia');
+  ok(await p.evaluate(async () => { await document.fonts.ready; return document.fonts.check('16px "Capture It"'); }), 'fonte Capture It carregada');
+  ok(await p.locator('aside div.font-brand').evaluate((e) => e.scrollWidth <= e.clientWidth + 1), 'nome "Central de Comando" cabe na barra lateral');
+
   // Teclado: link "pular para o conteúdo"
   await p.goto(BASE); await p.waitForSelector('text=Missão do dia'); await p.keyboard.press('Tab');
   ok(await p.evaluate(() => document.activeElement?.textContent?.includes('Pular')), 'primeiro Tab foca "Pular para o conteúdo"');

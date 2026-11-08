@@ -16,7 +16,7 @@ function Brand() {
     <div className="flex items-center gap-3 px-1">
       <BrandLogo size={38} />
       <div className="min-w-0 leading-none">
-        <div className="brand-title truncate text-[17px] text-fg">Central de Comando</div>
+        <div className="font-brand text-[14px] uppercase leading-tight tracking-[.01em] text-fg">Central de Comando</div>
         <div className="mt-1 text-[10px] font-semibold uppercase tracking-[.32em] text-gold">Comercial</div>
       </div>
     </div>

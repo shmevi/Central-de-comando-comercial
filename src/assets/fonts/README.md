@@ -2,7 +2,11 @@
 
 Licença: `LICENSE-capture-it.txt` (Koczman Bálint): uso pessoal e comercial permitido; não pode ser vendida diretamente.
 
-Coloque aqui o arquivo da fonte com um destes nomes (o primeiro encontrado é usado):
+Arquivo em uso: `capture-it.woff2` (39 KB) — gerado do `Capture_it.ttf` original (727 KB) com subconjunto latino
+(U+0020–007E, U+00A0–00FF e pontuação tipográfica: todos os acentos do português), sem alterar os desenhos.
+Comando usado: `pyftsubset Capture_it.ttf --unicodes="U+0020-007E,U+00A0-00FF,U+2013-2014,U+2018-201E,U+2022,U+2026,U+20AC" --flavor=woff2 --layout-features='*'`
+
+Para trocar, coloque o arquivo com um destes nomes (o primeiro encontrado é usado):
 
 - `capture-it.woff2` (recomendado — menor)
 - `capture-it.woff`
