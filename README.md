@@ -62,6 +62,7 @@ Nenhum projeto Supabase foi criado ou conectado por este repositório. Siga na o
    - `0002_notion_sync.sql` — sincronização Notion (`notion_sync_state`, fila de revisão).
    - `0003_relatorios_e_logo.sql` — conquistas/anotações dos relatórios (`report_entries`), coluna `settings.logo_path`
      e o bucket privado **branding** do Storage (logo personalizada), com regras por usuário. Não apaga nada; pode ser reaplicada.
+   - `0004_logo_5mb.sql` — aumenta o limite da logo no bucket `branding` para 5 MB (só um UPDATE).
 3. **Fechar o cadastro público** — **Authentication → Sign In / Providers** → desligue **Allow new users to sign up**.
    Deixe **Email** ligado e **Confirm email** ligado.
 4. **Criar o seu usuário** — **Authentication → Users → Add user → Create new user**: e-mail, senha forte e marque
@@ -95,9 +96,9 @@ iniciais (04, 05 e 06/11/2026). Se você já usava o modo local: **Configuraçõ
 
 ## Personalização
 
-- **Logo:** Configurações → Identidade visual → *Escolher imagem* (PNG, JPG/JPEG ou WEBP; até 2 MB no Supabase).
+- **Logo:** Configurações → Identidade visual → *Escolher imagem* (PNG, JPG/JPEG ou WEBP; até 5 MB no Supabase).
   Fica no Storage (bucket privado `branding`, pasta da sua conta) e aparece em todos os seus dispositivos. *Remover logo
-  personalizada* volta ao monograma CP. No modo local, a imagem fica só no navegador (até 700 KB).
+  personalizada* volta ao monograma CP. No modo local, a imagem fica só no navegador (até 1 MB).
 - **Fonte de identidade (Capture It):** coloque o arquivo em `src/assets/fonts/capture-it.woff2` (ou `.woff`/`.ttf`) —
   veja `src/assets/fonts/README.md` e a licença ao lado. Sem o arquivo, os títulos usam Barlow Condensed, sem erro.
 

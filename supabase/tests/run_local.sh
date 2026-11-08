@@ -21,3 +21,4 @@ $P -f "$ROOT/supabase/tests/report_logo_test.sql"
 $P -f "$ROOT/supabase/migrations/0002_notion_sync.sql"
 # A 0003 também (não destrutiva, idempotente)
 $P -f "$ROOT/supabase/migrations/0003_relatorios_e_logo.sql"
+$P -f "$ROOT/supabase/migrations/0004_logo_5mb.sql"

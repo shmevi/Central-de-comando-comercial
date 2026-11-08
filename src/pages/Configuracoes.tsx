@@ -17,7 +17,7 @@ import { fmtDuration, toMin, WEEKDAYS } from '@/lib/time';
 import { uid } from '@/lib/utils';
 import { hashPin } from '@/lib/pin';
 import { download } from '@/features/reports/build';
-import { LOGO_ACCEPT, removeLogoFile, uploadLogo } from '@/data/branding';
+import { LOGO_ACCEPT, LOGO_MAX_BYTES, LOGO_MAX_BYTES_LOCAL, fmtLimit, removeLogoFile, uploadLogo } from '@/data/branding';
 import { BrandLogo, useBrandLogo } from '@/components/layout/BrandLogo';
 
 function Section({ title, children, description }: { title: string; description?: string; children: React.ReactNode }) {
@@ -62,7 +62,7 @@ function LogoSection() {
         </div>
         <div className="min-w-0 flex-1 space-y-2">
           <p className="text-sm">{url ? 'Logo personalizada em uso.' : 'Usando o monograma padrão “CP”.'}</p>
-          <p className="text-xs text-muted">PNG, JPG/JPEG ou WEBP · até {DATA_MODE === 'supabase' ? '2 MB' : '700 KB'} · de preferência quadrada.</p>
+          <p className="text-xs text-muted">PNG, JPG/JPEG ou WEBP · até {fmtLimit(DATA_MODE === 'supabase' ? LOGO_MAX_BYTES : LOGO_MAX_BYTES_LOCAL)} · de preferência quadrada.</p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => inputRef.current?.click()}><ImagePlus size={14} />{busy ? 'Enviando…' : 'Escolher imagem'}</Button>
             {current && <Button size="sm" variant="ghost" disabled={busy} onClick={remove}><Trash2 size={14} />Remover logo personalizada</Button>}

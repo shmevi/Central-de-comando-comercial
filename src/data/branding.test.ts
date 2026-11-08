@@ -22,3 +22,15 @@ describe('logo personalizada', () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe('limite da logo', () => {
+  it('aceita até 5 MB no Supabase e 1 MB no modo local', async () => {
+    const { LOGO_MAX_BYTES_LOCAL, fmtLimit } = await import('./branding');
+    expect(LOGO_MAX_BYTES).toBe(5 * 1024 * 1024);
+    expect(fmtLimit(LOGO_MAX_BYTES)).toBe('5 MB');
+    expect(fmtLimit(LOGO_MAX_BYTES_LOCAL)).toBe('1 MB');
+    const quatroMB = new Uint8Array(4 * 1024 * 1024); quatroMB.set(png);
+    expect((await validateLogo(file(quatroMB, 'logo.png', 'image/png'), 'supabase')).ok).toBe(true);
+    expect((await validateLogo(file(quatroMB, 'logo.png', 'image/png'), 'local')).ok).toBe(false);
+  });
+});

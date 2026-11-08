@@ -11,8 +11,10 @@ import { supabase } from './supabaseClient';
 export const LOGO_BUCKET = 'branding';
 export const LOGO_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export const LOGO_ACCEPT = '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp';
-export const LOGO_MAX_BYTES = 2 * 1024 * 1024;          // igual ao limite do bucket na migration 0003
-export const LOGO_MAX_BYTES_LOCAL = 700 * 1024;          // localStorage tem pouco espaço
+export const LOGO_MAX_BYTES = 5 * 1024 * 1024;          // igual ao limite do bucket (migration 0004)
+export const LOGO_MAX_BYTES_LOCAL = 1024 * 1024;         // localStorage tem pouco espaço (~5 MB no total)
+/** "5 MB", "1 MB"… para mostrar na tela. */
+export const fmtLimit = (bytes: number) => (bytes >= 1024 * 1024 ? `${Math.round(bytes / (1024 * 1024))} MB` : `${Math.round(bytes / 1024)} KB`);
 const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 /** Confere o tipo pelos primeiros bytes (não confia só na extensão/MIME informado pelo navegador). */
@@ -26,7 +28,7 @@ export function sniffImageType(b: Uint8Array): (typeof LOGO_MIME)[number] | null
 export async function validateLogo(file: File, mode = DATA_MODE): Promise<{ ok: true; type: (typeof LOGO_MIME)[number] } | { ok: false; error: string }> {
   const max = mode === 'supabase' ? LOGO_MAX_BYTES : LOGO_MAX_BYTES_LOCAL;
   if (file.size === 0) return { ok: false, error: 'Arquivo vazio.' };
-  if (file.size > max) return { ok: false, error: `Imagem grande demais (máx. ${Math.round(max / 1024)} KB).` };
+  if (file.size > max) return { ok: false, error: `Imagem grande demais (máx. ${fmtLimit(max)}).` };
   const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
   const type = sniffImageType(head);
   if (!type) return { ok: false, error: 'Formato não aceito. Use PNG, JPG/JPEG ou WEBP.' };

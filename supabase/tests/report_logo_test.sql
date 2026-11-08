@@ -36,9 +36,9 @@ do $$ begin
   exception when check_violation then null; end;
 end $$;
 
--- 3. Storage: bucket privado com limite e tipos; cada usuário só na própria pasta
+-- 3. Storage: bucket privado com limite (5 MB após a 0004) e tipos; cada usuário só na própria pasta
 do $$ begin
-  if not exists (select 1 from storage.buckets where id = 'branding' and public = false and file_size_limit = 2097152
+  if not exists (select 1 from storage.buckets where id = 'branding' and public = false and file_size_limit = 5242880
                  and allowed_mime_types = array['image/png', 'image/jpeg', 'image/webp']) then
     raise exception 'FALHA: bucket branding ausente ou mal configurado';
   end if;
