@@ -13,5 +13,6 @@ Para trocar, coloque o arquivo com um destes nomes (o primeiro encontrado é usa
 - `capture-it.ttf`
 
 O carregamento é automático (`src/styles/brand-font.ts`): se o arquivo existir, a família **"Capture It"** é registrada
-via FontFace e usada em `font-brand` (marca "Central de Comando" e títulos principais). Se não existir, os títulos
-usam **Barlow Condensed** sem erro. A fonte é apenas embutida para exibição — não há link de download no sistema.
+via FontFace e usada em **todo o texto da Central** (`font-sans`, `font-display` e `font-brand`, no Tailwind). Caracteres
+que a fonte não tem caem letra a letra para a próxima da lista; se o arquivo não existir, o app usa **Inter** (texto) e
+**Barlow Condensed** (títulos) sem erro. A fonte é apenas embutida para exibição — não há link de download no sistema.

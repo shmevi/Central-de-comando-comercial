@@ -22,10 +22,11 @@ export default {
         purple: v('purple'),
       },
       fontFamily: {
-        // Fonte de identidade (Capture It) só em marca e títulos principais; cai para Barlow Condensed se ausente.
+        // Fonte de identidade (Capture It) em TODO o texto da Central. Caracteres que ela não tem (ex.: "—", "º", setas)
+        // e o caso de o arquivo faltar caem, letra a letra, para Barlow Condensed (títulos) ou Inter (texto).
         brand: ['"Capture It"', '"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
-        display: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['"Capture It"', '"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
+        sans: ['"Capture It"', 'Inter', 'system-ui', 'sans-serif'],
       },
       borderRadius: { lg: '10px', xl: '14px', '2xl': '18px' },
       boxShadow: { 'elev-1': 'var(--elev-1)', 'elev-2': 'var(--elev-2)' },

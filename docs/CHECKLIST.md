@@ -49,7 +49,7 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [A] Logo: escolher PNG, prévia, persistir após recarregar, recusar SVG disfarçado, remover e voltar ao monograma
 - [A] Modo Supabase: logo no Storage na pasta do usuário; outro usuário não herda; conquistas em report_entries
 - [A] Storage/RLS (PostgreSQL): bucket privado com limite e tipos; ninguém lê/grava/apaga a pasta de outro usuário
-- [M] Fonte Capture It aparece na marca e nos títulos depois que o arquivo for adicionado em src/assets/fonts/
+- [M] Fonte Capture It aparece em todo o texto (menus, títulos, tabelas, formulários e botões); símbolos que ela não tem (—, º, setas) aparecem na fonte reserva
 
 ## Tarefas — origem
 - [A] Todas / Rotina-Central / Notion (external_ref "notion:") com contadores; combina com busca, filtros, lista e Kanban
