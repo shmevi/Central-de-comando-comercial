@@ -37,3 +37,19 @@ export async function toggleMission(t: Task, all: Task[], date: string): Promise
   await actions.update('tasks', t.id, { is_mission: true, mission_date: date, history: withHistory(t, 'Adicionada à missão do dia') });
   return null;
 }
+
+/**
+ * Conclui a tarefa e devolve o "Desfazer": volta ao status anterior e apaga a próxima ocorrência
+ * que a recorrência tenha criado nesse momento (nada além disso é tocado).
+ */
+export async function completeTask(t: Task): Promise<() => Promise<void>> {
+  const prev = t.status;
+  const before = new Set(getItems('tasks').map((x) => x.id));
+  const saved = await setTaskStatus(t, 'concluida');
+  const spawned = getItems('tasks').filter((x) => !before.has(x.id)).map((x) => x.id);
+  return async () => {
+    for (const id of spawned) await actions.remove('tasks', id);
+    const cur = getItems('tasks').find((x) => x.id === saved.id) ?? saved;
+    await setTaskStatus(cur, prev);
+  };
+}

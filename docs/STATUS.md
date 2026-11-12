@@ -36,6 +36,7 @@
 - **Quadros iguais aos do Notion**: OKRs em "Kanban por Objetivo" (colunas = Objetivos, só KRs ativos, status no cartão)
   e Tarefas agrupadas por ATRIBUIÇÃO (70% / 20% / 10% / OFF WORK, só ativas) ou por status com os nomes do Notion.
 
+- **Tarefas organizadas por prazo**: abas Todas / Hoje / Atrasadas / Próximos 7 dias; lista agrupada (atrasadas, hoje, amanhã, 7 dias, depois, sem prazo; concluídas recolhidas); busca + filtros recolhidos com etiquetas removíveis; adicionar rápido (Enter); concluir com "Desfazer"; excluir dentro da tarefa; Kanban com abas no celular e menu "⋯" para mover.
 - **Tela Hoje enxuta**: o que fazer agora, números que importam, Missão do dia, próximos itens e anotação rápida.
 - **Desempenho**: abertura em uma onda de pedidos, telas pré-carregadas ao passar o mouse/tocar no menu, ações com
   resposta imediata (e desfeitas se o servidor recusar), logo otimizada e em cache, sincronização do Notion em lote.

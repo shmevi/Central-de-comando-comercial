@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dueText, emptyTask, isOverdue, missionFor, nextDueDate, statusPatch } from './taskLogic';
+import { dueGroup, dueText, emptyTask, matchesTab, isOverdue, missionFor, nextDueDate, statusPatch } from './taskLogic';
 import type { Task } from '@/domain/types';
 const t = (p: Partial<Task>): Task => ({ ...emptyTask(), id: 'x', created_at: '', updated_at: '', title: 'T', ...p });
 
@@ -58,5 +58,31 @@ describe('dueText (prazo em uma frase, tela Hoje)', () => {
     expect(dueText('2026-11-12', '2026-11-12')).toEqual({ text: 'Vence hoje', late: false });
     expect(dueText('2026-11-13', '2026-11-12')).toEqual({ text: 'Vence amanhã', late: false });
     expect(dueText('2026-11-20', '2026-11-12')).toEqual({ text: 'Prazo 20/11/2026', late: false });
+  });
+});
+
+describe('grupos por prazo e abas (tela Tarefas)', () => {
+  const T = (o: Partial<Task>) => ({ ...emptyTask(), id: 'x', created_at: '', updated_at: '', title: 't', ...o }) as Task;
+  const today = '2026-11-12';
+  it('cada tarefa cai em um grupo só', () => {
+    expect(dueGroup(T({ due_date: '2026-11-04' }), today)).toBe('atrasadas');
+    expect(dueGroup(T({ due_date: today }), today)).toBe('hoje');
+    expect(dueGroup(T({ due_date: '2026-11-13' }), today)).toBe('amanha');
+    expect(dueGroup(T({ due_date: '2026-11-19' }), today)).toBe('semana');
+    expect(dueGroup(T({ due_date: '2026-11-20' }), today)).toBe('depois');
+    expect(dueGroup(T({ due_date: null }), today)).toBe('sem_prazo');
+    expect(dueGroup(T({ due_date: '2026-11-04', status: 'concluida' }), today)).toBe('concluidas');
+    expect(dueGroup(T({ status: 'cancelada' }), today)).toBe('concluidas');
+  });
+  it('abas: Hoje, Atrasadas e Próximos 7 dias só com abertas', () => {
+    expect(matchesTab(T({ due_date: today }), 'hoje', today)).toBe(true);
+    expect(matchesTab(T({ due_date: today, status: 'concluida' }), 'hoje', today)).toBe(false);
+    expect(matchesTab(T({ due_date: '2026-11-04' }), 'atrasadas', today)).toBe(true);
+    expect(matchesTab(T({ due_date: '2026-11-19' }), 'semana', today)).toBe(true);
+    expect(matchesTab(T({ due_date: '2026-11-04' }), 'semana', today)).toBe(false);
+    expect(matchesTab(T({ due_date: null }), '', today)).toBe(true);
+  });
+  it('prazo de tarefa concluída mostra só a data (sem "Atrasada")', () => {
+    expect(dueText('2026-11-04', today, false)).toEqual({ text: 'Prazo 04/11/2026', late: false });
   });
 });

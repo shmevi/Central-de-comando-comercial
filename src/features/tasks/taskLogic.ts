@@ -57,7 +57,8 @@ export const taskOrigin = (t: Pick<Task, 'external_ref'>): TaskOrigin => (isFrom
 export const matchesOrigin = (t: Pick<Task, 'external_ref'>, origin: 'todas' | TaskOrigin) => origin === 'todas' || taskOrigin(t) === origin;
 
 /** Prazo em uma frase curta: "Atrasada há 3 dias", "Vence hoje", "Vence amanhã", "Prazo 15/11/2026". */
-export function dueText(due: string, today: string): { text: string; late: boolean } {
+export function dueText(due: string, today: string, open = true): { text: string; late: boolean } {
+  if (!open) return { text: `Prazo ${fmtDate(due)}`, late: false }; // concluída/cancelada: só a data
   if (due < today) {
     let n = 1; while (n < 400 && addDays(due, n) < today) n++;
     return { text: n === 1 ? 'Atrasada há 1 dia' : `Atrasada há ${n} dias`, late: true };
@@ -65,4 +66,32 @@ export function dueText(due: string, today: string): { text: string; late: boole
   if (due === today) return { text: 'Vence hoje', late: false };
   if (due === addDays(today, 1)) return { text: 'Vence amanhã', late: false };
   return { text: `Prazo ${fmtDate(due)}`, late: false };
+}
+
+/** Grupos da lista de tarefas, na ordem em que aparecem (o que pede atenção primeiro). */
+export type DueGroup = 'atrasadas' | 'hoje' | 'amanha' | 'semana' | 'depois' | 'sem_prazo' | 'concluidas';
+export const DUE_GROUPS: { key: DueGroup; label: string }[] = [
+  { key: 'atrasadas', label: 'Atrasadas' }, { key: 'hoje', label: 'Hoje' }, { key: 'amanha', label: 'Amanhã' },
+  { key: 'semana', label: 'Próximos 7 dias' }, { key: 'depois', label: 'Depois' }, { key: 'sem_prazo', label: 'Sem prazo' },
+  { key: 'concluidas', label: 'Concluídas e canceladas' },
+];
+export function dueGroup(t: Task, today: string): DueGroup {
+  if (!isOpen(t)) return 'concluidas';
+  if (!t.due_date) return 'sem_prazo';
+  if (t.due_date < today) return 'atrasadas';
+  if (t.due_date === today) return 'hoje';
+  if (t.due_date === addDays(today, 1)) return 'amanha';
+  return t.due_date <= addDays(today, 7) ? 'semana' : 'depois';
+}
+
+/** Abas da tela de Tarefas. "semana" = abertas com prazo de hoje até 7 dias (atrasadas têm aba própria). */
+export type TaskTab = '' | 'hoje' | 'atrasadas' | 'semana' | 'missao';
+export function matchesTab(t: Task, tab: TaskTab, today: string): boolean {
+  switch (tab) {
+    case 'hoje': return isOpen(t) && t.due_date === today;
+    case 'atrasadas': return isOverdue(t, today);
+    case 'semana': return isOpen(t) && !!t.due_date && t.due_date >= today && t.due_date <= addDays(today, 7);
+    case 'missao': return t.is_mission && t.mission_date === today;
+    default: return true;
+  }
 }

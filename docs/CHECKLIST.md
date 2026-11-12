@@ -50,6 +50,7 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [A] Modo Supabase: logo no Storage na pasta do usuário; outro usuário não herda; conquistas em report_entries
 - [A] Storage/RLS (PostgreSQL): bucket privado com limite e tipos; ninguém lê/grava/apaga a pasta de outro usuário
 - [M] Fonte Capture It aparece nos títulos (páginas e cartões); o restante do texto (menus, tabelas, formulários e botões) usa Inter; símbolos que ela não tem (—, º, setas) aparecem na fonte reserva
+- [M] Tarefas: abas por prazo com contagem; grupos Atrasadas/Hoje/Amanhã/7 dias/Depois/Sem prazo; concluídas recolhidas; "Filtros" abre origem/status/prioridade/categoria/missão e cada filtro ligado vira etiqueta com "x"; Enter no campo rápido cria a tarefa (na aba Hoje, com prazo de hoje); concluir mostra "Desfazer" (desfaz também a próxima ocorrência de recorrentes); lixeira só dentro da tarefa; Kanban no celular por abas; menu "⋯" move o cartão
 - [M] Hoje: topo com "Agora" e jornada, números só quando não são zero, Missão do dia com até 3 sugestões (uma linha de prazo cada), "Próximos" (rotina + agenda, só o que vem) e anotação rápida com as anotações recolhidas
 
 ## Tarefas — origem

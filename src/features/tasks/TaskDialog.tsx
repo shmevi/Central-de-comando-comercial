@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Dialog, FormSection } from '@/components/ui/dialog';
+import { Dialog, FormSection, useConfirm } from '@/components/ui/dialog';
 import { NotionBadge } from '@/components/ui/misc';
 import { Button } from '@/components/ui/button';
 import { useDraft } from '@/components/ui/use-draft';
@@ -26,6 +26,10 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
   const [newItem, setNewItem] = React.useState('');
   const { settings } = useSettings();
   const toast = useToast();
+  const { confirmDelete, confirmNode } = useConfirm();
+  const remove = () => task && confirmDelete('Excluir tarefa', `“${task.title}”`, async () => {
+    try { await actions.remove('tasks', task.id); toast('Tarefa excluída.'); onOpenChange(false); } catch (e) { toast((e as Error).message, 'erro'); }
+  });
 
   async function save(e?: React.FormEvent) {
     e?.preventDefault();
@@ -57,7 +61,9 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
     <Dialog open={open} onOpenChange={onOpenChange} title={task ? 'Editar tarefa' : 'Nova tarefa'} wide
       badge={notion ? <NotionBadge /> : undefined}
       description={task ? `Criada em ${fmtDateTime(task.created_at)}` : 'Preencha o essencial; o resto é opcional.'}
-      footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={() => save()} disabled={saving}>{saving ? 'Salvando…' : 'Salvar tarefa'}</Button></>}>
+      footer={<>
+        {task && <Button variant="ghost" className="mr-auto text-danger hover:text-danger" onClick={remove}><Trash2 size={15} />Excluir</Button>}
+        <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={() => save()} disabled={saving}>{saving ? 'Salvando…' : 'Salvar tarefa'}</Button></>}>
       <form onSubmit={save} className="space-y-7">
         {notion && <p className="panel px-3 py-2.5 text-xs text-muted">Sincronizada do Notion. Título, status, prioridade e prazo alterados aqui ficam marcados como pendentes de envio — o envio ao Notion é uma fase futura.</p>}
         <FormSection title="Essencial">
@@ -118,6 +124,7 @@ export function TaskDialog({ open, onOpenChange, task, defaults }: { open: boole
         )}
         <button type="submit" className="hidden" />
       </form>
+      {confirmNode}
     </Dialog>
   );
 }

@@ -46,11 +46,28 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
 
   // Concluir tarefa
   await p.locator('input[aria-label="Concluir Tarefa E2E"]').check();
-  await p.waitForTimeout(200);
+  await p.waitForSelector('input[aria-label="Reabrir Tarefa E2E"]', { state: 'attached' });
+  ok(await p.locator('text=Tarefa concluída.').count() === 1 && await p.locator('button:has-text("Desfazer")').count() === 1, 'concluir mostra o aviso com "Desfazer"');
+  await p.click('button:has-text("Desfazer")'); await p.waitForSelector('input[aria-label="Concluir Tarefa E2E"]');
+  ok(true, '"Desfazer" volta a tarefa para aberta');
+  await p.locator('input[aria-label="Concluir Tarefa E2E"]').check();
+  await p.waitForSelector('input[aria-label="Reabrir Tarefa E2E"]', { state: 'attached' });
   ok(await p.locator('input[aria-label="Reabrir Tarefa E2E"]').count() === 1, 'tarefa concluída');
 
   // Persistência
-  await p.reload(); await p.waitForSelector('text=Tarefa E2E');
+  await p.reload(); await p.waitForSelector('#nova-rapida');
+  ok(await p.locator('summary:has-text("Concluídas")').count() === 1, 'concluídas ficam recolhidas no fim da lista');
+
+  // Lista agrupada por prazo, abas e adicionar rápido (Enter)
+  ok(await p.locator('h2:has-text("Atrasadas") + ul li').count() >= 1, 'lista agrupada por prazo (grupo Atrasadas)');
+  await p.fill('#nova-rapida', 'Rapida E2E'); await p.keyboard.press('Enter');
+  await p.waitForSelector('h2:has-text("Sem prazo") + ul li:has-text("Rapida E2E")');
+  ok(true, 'adicionar rápido cria a tarefa (sem prazo) com Enter');
+  await p.click('button[aria-pressed]:has-text("Hoje")'); await p.waitForTimeout(150);
+  ok(new URL(p.url()).searchParams.get('f') === 'hoje' && await p.locator('li:has-text("Rapida E2E")').count() === 0, 'aba Hoje mostra só o que vence hoje');
+  await p.fill('#nova-rapida', 'Para hoje E2E'); await p.keyboard.press('Enter'); await p.waitForSelector('li:has-text("Para hoje E2E")');
+  ok(await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:tasks') || '[]').find((t) => t.title === 'Para hoje E2E')?.due_date) === recifeToday(), 'na aba Hoje, a tarefa rápida já nasce com prazo de hoje');
+  await p.click('button[aria-pressed]:has-text("Todas")'); await p.waitForTimeout(150);
   ok(await p.locator('input[aria-label="Reabrir Tarefa E2E"]').isChecked(), 'persistência após recarregar');
 
   // Abrir para editar: o formulário já aparece com os dados da tarefa (sem piscar valores antigos)
@@ -86,7 +103,10 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   await p.fill('role=dialog >> label:has-text("Prazo") >> xpath=following-sibling::input', isoMinusDays(recifeToday(), 10));
   await p.getByRole('dialog').getByRole('combobox', { name: /^Recorrência/ }).selectOption('semanal');
   await p.click('role=dialog >> button:has-text("Salvar")'); await p.waitForTimeout(300);
-  for (const label of ['Concluir', 'Reabrir', 'Concluir']) { await p.locator(`input[aria-label="${label} Recorrente E2E"]`).first().click(); await p.waitForTimeout(250); }
+  for (const label of ['Concluir', 'Reabrir', 'Concluir']) {
+    if (label === 'Reabrir' && !(await p.locator('details:has(summary:has-text("Concluídas"))').getAttribute('open').then((v) => v !== null))) await p.click('summary:has-text("Concluídas")');
+    await p.locator(`input[aria-label="${label} Recorrente E2E"]`).first().click(); await p.waitForTimeout(600);
+  }
   ok(await p.locator('li:has-text("Recorrente E2E")').count() === 2, 'recorrência não duplica ao reabrir e concluir de novo');
   const dues = (await p.locator('li:has-text("Recorrente E2E")').allInnerTexts()).map((t) => /(\d{2})\/(\d{2})\/(\d{4})/.exec(t)).filter(Boolean).map((m) => `${m[3]}-${m[2]}-${m[1]}`);
   ok(dues.some((d) => d > recifeToday()), `tarefa vencida há 10 dias, concluída hoje: próxima ocorrência cai depois de hoje (${dues.join(', ')})`);
@@ -149,7 +169,10 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   // Origem: Todas / Rotina-Central / Notion — combina com busca, lista e Kanban, sem alterar dados
   await p.goto(BASE + '/tarefas'); await p.waitForSelector('text=Revisar funil de matrículas');
   const totalAntes = await p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:tasks') || '[]').length);
+  ok(await p.locator('role=radio[name^="Notion"]').count() === 0, 'filtros ficam recolhidos até tocar em "Filtros"');
+  await p.click('button:has-text("Filtros")');
   await p.click('role=radio[name^="Notion"]'); await p.waitForTimeout(200);
+  ok(await p.locator('button[aria-label="Remover filtro: Origem: Notion"]').count() === 1, 'filtro ligado aparece como etiqueta removível');
   ok(await p.locator('li:has-text("Revisar funil de matrículas")').count() === 1 && await p.locator('li:has-text("Tarefa E2E")').count() === 0, 'filtro Notion mostra só tarefas do Notion');
   ok(new URL(p.url()).searchParams.get('origem') === 'notion', 'origem fica na URL');
   await p.fill('#busca', 'funil'); await p.waitForTimeout(150);

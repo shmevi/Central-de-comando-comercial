@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { CalendarClock, ListChecks, Star, Trash2 } from 'lucide-react';
 import type { Task } from '@/domain/types';
 import { PRIORITY, TASK_STATUS } from '@/domain/labels';
@@ -6,8 +7,8 @@ import { Badge, DemoBadge, NotionBadge } from '@/components/ui/misc';
 import { isFromNotion, isPersonalNotion } from '@/integrations/notion/mapping';
 import { fmtDate, todayISO } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import { dueText, isOverdue } from './taskLogic';
-import { toggleComplete } from './actions';
+import { dueText, isOpen, isOverdue } from './taskLogic';
+import { completeTask, setTaskStatus } from './actions';
 import { useToast } from '@/components/ui/toast';
 
 /** Cor da prioridade (filete à esquerda do cartão). */
@@ -31,14 +32,23 @@ export function TaskMeta({ task, compact }: { task: Task; compact?: boolean }) {
   );
 }
 
-/** Versão enxuta (tela Hoje): prioridade só no filete colorido; uma linha com o prazo e, se houver, a instituição. */
+/** Status que vale mostrar (o normal, "a fazer", não aparece). */
+const SPECIAL_STATUS: Partial<Record<Task['status'], string>> = { em_andamento: 'border-info/40 text-info', aguardando: 'border-orange/40 text-orange', cancelada: 'border-border text-muted' };
+
+/** Versão enxuta (Hoje e Tarefas): prioridade só no filete colorido; uma linha com status especial, prazo, checklist, instituição e origem. */
 function TaskMetaMinimal({ task }: { task: Task }) {
-  const due = task.due_date ? dueText(task.due_date, todayISO()) : null;
-  if (!due && !task.institution_id && !task.is_demo) return null;
+  const due = task.due_date ? dueText(task.due_date, todayISO(), isOpen(task)) : null;
+  const special = SPECIAL_STATUS[task.status];
+  const items = task.checklist.length;
+  const showInst = !!task.institution_id && !isPersonalNotion(task);
+  if (!due && !special && !items && !showInst && !isFromNotion(task) && !task.is_demo) return null;
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+      {special && <span className={cn('chip', special)}>{TASK_STATUS[task.status]}</span>}
       {due && <span className={cn(due.late && 'font-medium text-danger')}>{due.text}</span>}
-      {task.institution_id && !isPersonalNotion(task) && <InstitutionBadge id={task.institution_id} />}
+      {items > 0 && <span className="inline-flex items-center gap-1"><ListChecks size={12} aria-hidden />{task.checklist.filter((c) => c.done).length}/{items}</span>}
+      {showInst && <InstitutionBadge id={task.institution_id} />}
+      {isFromNotion(task) && <NotionBadge />}
       {task.is_demo && <DemoBadge />}
     </div>
   );
@@ -49,12 +59,23 @@ export function TaskRow({ task, onOpen, onMission, onDelete, compact, minimal }:
   const today = todayISO();
   const done = task.status === 'concluida';
   const inMission = task.is_mission && task.mission_date === today;
+  const [leaving, setLeaving] = React.useState(false);
+  async function onCheck() {
+    try {
+      if (done) { await setTaskStatus(task, 'a_fazer'); toast('Tarefa reaberta.'); return; }
+      setLeaving(true); // saída curta antes de ir para "Concluídas"
+      await new Promise((r) => setTimeout(r, 160));
+      const undo = await completeTask(task);
+      toast('Tarefa concluída.', 'ok', { label: 'Desfazer', onClick: () => { undo().then(() => toast('Conclusão desfeita.', 'info')).catch((e) => toast((e as Error).message, 'erro')); } });
+    } catch (e) { toast((e as Error).message, 'erro'); } finally { setLeaving(false); }
+  }
   return (
-    <li className={cn('relative flex items-start gap-3 overflow-hidden rounded-xl border border-border/70 bg-surface-2/50 pl-4 pr-2 transition hover:border-border hover:bg-surface-2', minimal ? 'py-2.5' : 'py-3')}>
+    <li title={`Prioridade ${PRIORITY[task.priority].label.toLowerCase()}`}
+      className={cn('relative flex items-start gap-3 overflow-hidden rounded-xl border border-border/70 bg-surface-2/50 pl-4 pr-2 transition-all duration-150 hover:border-border hover:bg-surface-2', minimal ? 'py-2.5' : 'py-3', leaving && 'translate-x-3 opacity-0')}>
       <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: PRIORITY_TONE[task.priority] }} />
-      <input type="checkbox" className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded accent-[rgb(var(--gold-300))]" checked={done}
-        aria-label={done ? `Reabrir ${task.title}` : `Concluir ${task.title}`}
-        onChange={() => toggleComplete(task).then(() => toast(done ? 'Tarefa reaberta.' : 'Tarefa concluída.')).catch((e) => toast(e.message, 'erro'))} />
+      <span className="sr-only">Prioridade {PRIORITY[task.priority].label}.</span>
+      <input type="checkbox" className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded accent-[rgb(var(--gold-300))]" checked={done || leaving}
+        aria-label={done ? `Reabrir ${task.title}` : `Concluir ${task.title}`} onChange={onCheck} />
       <div className="min-w-0 flex-1">
         <button type="button" onClick={() => onOpen(task)} className={cn('text-left text-sm font-medium leading-snug hover:text-gold', done && 'text-muted line-through')}>{task.title}</button>
         {minimal ? <TaskMetaMinimal task={task} /> : <div className="mt-1.5"><TaskMeta task={task} compact={compact} /></div>}
