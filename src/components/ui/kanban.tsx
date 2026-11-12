@@ -42,7 +42,7 @@ export function KanbanBoard<T extends { id: string }, S extends string>({ column
               onDrop={() => drop(col.value)}
               className={cn('flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-2xl border bg-surface/60 p-3 transition-colors sm:w-[300px]', grid === 'lg' && 'lg:w-auto lg:max-w-none', grid === 'xl' && 'xl:w-auto xl:max-w-none',
                 isOver ? 'border-gold-300/50 bg-gold-300/[.04]' : 'border-border/60')}>
-              <h2 className="mb-3 flex items-center justify-between gap-2 px-1 font-sans text-sm font-semibold tracking-normal">
+              <h2 className="mb-3 flex items-center justify-between gap-2 px-1 font-display text-sm font-semibold tracking-wide">
                 <span className="flex items-center gap-2">
                   <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: col.tone ?? 'rgb(var(--muted))' }} />{col.label}
                 </span>

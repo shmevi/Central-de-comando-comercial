@@ -1,7 +1,7 @@
 import type { Recurrence, Task, TaskStatus } from '@/domain/types';
 import { isFromNotion } from '@/integrations/notion/mapping';
 import { TASK_STATUS as TASK_STATUS_LABEL } from '@/domain/labels';
-import { addDays, isWeekend } from '@/lib/time';
+import { addDays, fmtDate, isWeekend } from '@/lib/time';
 import { nowIso } from '@/lib/utils';
 
 export const MAX_MISSION = 3;
@@ -55,3 +55,14 @@ export type TaskOrigin = 'central' | 'notion';
 export const taskOrigin = (t: Pick<Task, 'external_ref'>): TaskOrigin => (isFromNotion(t) ? 'notion' : 'central');
 /** Filtro de origem; 'todas' não filtra. Não altera nem duplica dados — só decide o que aparece. */
 export const matchesOrigin = (t: Pick<Task, 'external_ref'>, origin: 'todas' | TaskOrigin) => origin === 'todas' || taskOrigin(t) === origin;
+
+/** Prazo em uma frase curta: "Atrasada há 3 dias", "Vence hoje", "Vence amanhã", "Prazo 15/11/2026". */
+export function dueText(due: string, today: string): { text: string; late: boolean } {
+  if (due < today) {
+    let n = 1; while (n < 400 && addDays(due, n) < today) n++;
+    return { text: n === 1 ? 'Atrasada há 1 dia' : `Atrasada há ${n} dias`, late: true };
+  }
+  if (due === today) return { text: 'Vence hoje', late: false };
+  if (due === addDays(today, 1)) return { text: 'Vence amanhã', late: false };
+  return { text: `Prazo ${fmtDate(due)}`, late: false };
+}

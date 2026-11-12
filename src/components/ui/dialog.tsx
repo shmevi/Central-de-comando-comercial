@@ -18,7 +18,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
           <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-5">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <D.Title className="font-sans text-lg font-semibold tracking-normal">{title}</D.Title>
+                <D.Title className="font-display text-lg font-semibold tracking-wide">{title}</D.Title>
                 {badge}
               </div>
               {description ? <D.Description className="mt-0.5 text-sm text-muted">{description}</D.Description> : <D.Description className="sr-only">{title}</D.Description>}

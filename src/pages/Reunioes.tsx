@@ -122,7 +122,7 @@ export default function Reunioes() {
             ))}
           </ul>
           <Card className="h-fit p-5">
-            <h2 className="mb-3 font-sans text-base font-semibold tracking-normal">Encaminhamentos pendentes</h2>
+            <h2 className="mb-3 font-display text-base font-semibold tracking-wide">Encaminhamentos pendentes</h2>
             {pending.length === 0 ? <p className="text-sm text-muted">Nenhum pendente.</p> : (
               <ul className="space-y-2 text-sm">{pending.map((a) => (
                 <li key={a.id} className="rounded-lg bg-surface-2/60 p-2">

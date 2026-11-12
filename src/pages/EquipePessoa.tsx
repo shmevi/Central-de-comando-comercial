@@ -94,7 +94,7 @@ export default function EquipePessoa() {
         </div>
 
         <Card className="p-4">
-          <h2 className="mb-2 font-sans text-base font-semibold tracking-normal">Mês a mês</h2>
+          <h2 className="mb-2 font-display text-base font-semibold tracking-wide">Mês a mês</h2>
           <MetricsTable entries={mine} months={months} caption={`Números de ${person.name} mês a mês (${instLabel})`} />
         </Card>
       </>}
@@ -116,7 +116,7 @@ function StatCard({ label, value, lines = [], empty, extra }: { label: string; v
 function ChartCard({ title, summary, children }: { title: string; summary: string; children: React.ReactElement }) {
   return (
     <Card className="p-4">
-      <h2 className="mb-2 font-sans text-base font-semibold tracking-normal">{title}</h2>
+      <h2 className="mb-2 font-display text-base font-semibold tracking-wide">{title}</h2>
       <figure role="img" aria-label={summary} className="h-52 w-full">
         <ResponsiveContainer width="100%" height="100%">{children}</ResponsiveContainer>
       </figure>

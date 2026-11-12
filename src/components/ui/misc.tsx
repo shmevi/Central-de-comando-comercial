@@ -12,7 +12,7 @@ export function CardHeader({ title, icon, action, subtitle }: { title: string; i
       <div className="flex min-w-0 items-center gap-3">
         {icon && <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border/70 bg-surface-2 text-gold" aria-hidden>{icon}</span>}
         <div className="min-w-0">
-          <h2 className="text-base font-semibold normal-case tracking-normal font-sans">{title}</h2>
+          <h2 className="font-display text-base font-semibold tracking-wide">{title}</h2>
           {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
         </div>
       </div>

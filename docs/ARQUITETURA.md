@@ -123,7 +123,7 @@ Tokens em `src/styles/tokens.css` (canais RGB, consumidos pelo Tailwind em `tail
 | `--fg` / `--muted` | #F3EFE6 / #A39E92 | texto creme e cinza-quente |
 | `--chart-1` | #B08A3D | barras (validado para contraste e banda de luminosidade) |
 
-- Títulos e botões: **Barlow Condensed**, caixa alta, negrito. Texto: **Inter**.
+- Títulos (h1–h4, títulos de cartão, marca): **Capture It** (reserva: Barlow Condensed). Texto, botões, etiquetas e campos: **Inter**.
 - Botão primário: gradiente dourado com texto escuro; secundário: contorno dourado; raios 12–16px.
 - Modo claro (`data-theme="light"`) com tons de dourado escurecidos para manter contraste AA.
 - Monograma "CP" (sem reproduzir o leão do site). Foco visível em todos os controles; link "Pular para o conteúdo".

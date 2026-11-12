@@ -23,7 +23,7 @@ import { BrandLogo, useBrandLogo } from '@/components/layout/BrandLogo';
 function Section({ title, children, description }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <Card className="p-5">
-      <h2 className="font-sans text-base font-semibold tracking-normal">{title}</h2>
+      <h2 className="font-display text-base font-semibold tracking-wide">{title}</h2>
       {description && <p className="mt-1 text-xs text-muted">{description}</p>}
       <div className="mt-4 space-y-4">{children}</div>
     </Card>

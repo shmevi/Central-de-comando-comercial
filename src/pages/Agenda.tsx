@@ -134,7 +134,7 @@ export default function Agenda() {
             {weekDates(date).map((d) => (
               <section key={d} className={cn('card flex min-h-[260px] flex-col p-2', d === now.date && 'border-gold-300', isWeekend(d) && 'opacity-70')} aria-label={fmtLongDate(d)}>
                 <button type="button" onClick={() => { setDate(d); setView('dia'); }} className="mb-1 text-left">
-                  <h2 className="font-sans text-sm font-semibold tracking-normal">{WEEKDAYS_SHORT[weekdayOf(d)]} {fmtDate(d).slice(0, 5)}</h2>
+                  <h2 className="font-display text-sm font-semibold tracking-wide">{WEEKDAYS_SHORT[weekdayOf(d)]} {fmtDate(d).slice(0, 5)}</h2>
                   <p className="text-[11px] text-muted">{isWeekend(d) ? 'Sem expediente' : focus(d) ?? ''}</p>
                 </button>
                 <ul className="flex flex-1 flex-col gap-1">{dayItems(d).map((i) => <li key={i.id}><ItemChip i={i} conflict={conflicts.has(i.id)} onClick={onItem(i)} /></li>)}</ul>

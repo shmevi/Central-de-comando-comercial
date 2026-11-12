@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { emptyTask, isOverdue, missionFor, nextDueDate, statusPatch } from './taskLogic';
+import { dueText, emptyTask, isOverdue, missionFor, nextDueDate, statusPatch } from './taskLogic';
 import type { Task } from '@/domain/types';
 const t = (p: Partial<Task>): Task => ({ ...emptyTask(), id: 'x', created_at: '', updated_at: '', title: 'T', ...p });
 
@@ -47,5 +47,16 @@ describe('origem da tarefa (Central × Notion)', () => {
     expect(items.filter((t) => matchesOrigin(t, 'notion'))).toEqual([{ external_ref: 'notion:a' }]);
     expect(items.filter((t) => matchesOrigin(t, 'central'))).toEqual([{ external_ref: null }]);
     expect(JSON.stringify(items)).toBe(snapshot);
+  });
+});
+
+describe('dueText (prazo em uma frase, tela Hoje)', () => {
+  it('atrasada, hoje, amanhã e data futura', () => {
+    expect(dueText('2026-11-04', '2026-11-12')).toEqual({ text: 'Atrasada há 8 dias', late: true });
+    expect(dueText('2026-11-11', '2026-11-12')).toEqual({ text: 'Atrasada há 1 dia', late: true });
+    expect(dueText('2026-10-31', '2026-11-02')).toEqual({ text: 'Atrasada há 2 dias', late: true }); // vira o mês
+    expect(dueText('2026-11-12', '2026-11-12')).toEqual({ text: 'Vence hoje', late: false });
+    expect(dueText('2026-11-13', '2026-11-12')).toEqual({ text: 'Vence amanhã', late: false });
+    expect(dueText('2026-11-20', '2026-11-12')).toEqual({ text: 'Prazo 20/11/2026', late: false });
   });
 });

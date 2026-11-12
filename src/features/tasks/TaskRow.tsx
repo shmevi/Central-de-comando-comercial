@@ -6,7 +6,7 @@ import { Badge, DemoBadge, NotionBadge } from '@/components/ui/misc';
 import { isFromNotion, isPersonalNotion } from '@/integrations/notion/mapping';
 import { fmtDate, todayISO } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import { isOverdue } from './taskLogic';
+import { dueText, isOverdue } from './taskLogic';
 import { toggleComplete } from './actions';
 import { useToast } from '@/components/ui/toast';
 
@@ -31,20 +31,33 @@ export function TaskMeta({ task, compact }: { task: Task; compact?: boolean }) {
   );
 }
 
-export function TaskRow({ task, onOpen, onMission, onDelete, compact }: { task: Task; onOpen: (t: Task) => void; onMission?: (t: Task) => void; onDelete?: (t: Task) => void; compact?: boolean }) {
+/** Versão enxuta (tela Hoje): prioridade só no filete colorido; uma linha com o prazo e, se houver, a instituição. */
+function TaskMetaMinimal({ task }: { task: Task }) {
+  const due = task.due_date ? dueText(task.due_date, todayISO()) : null;
+  if (!due && !task.institution_id && !task.is_demo) return null;
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+      {due && <span className={cn(due.late && 'font-medium text-danger')}>{due.text}</span>}
+      {task.institution_id && !isPersonalNotion(task) && <InstitutionBadge id={task.institution_id} />}
+      {task.is_demo && <DemoBadge />}
+    </div>
+  );
+}
+
+export function TaskRow({ task, onOpen, onMission, onDelete, compact, minimal }: { task: Task; onOpen: (t: Task) => void; onMission?: (t: Task) => void; onDelete?: (t: Task) => void; compact?: boolean; minimal?: boolean }) {
   const toast = useToast();
   const today = todayISO();
   const done = task.status === 'concluida';
   const inMission = task.is_mission && task.mission_date === today;
   return (
-    <li className="relative flex items-start gap-3 overflow-hidden rounded-xl border border-border/70 bg-surface-2/50 py-3 pl-4 pr-2 transition hover:border-border hover:bg-surface-2">
+    <li className={cn('relative flex items-start gap-3 overflow-hidden rounded-xl border border-border/70 bg-surface-2/50 pl-4 pr-2 transition hover:border-border hover:bg-surface-2', minimal ? 'py-2.5' : 'py-3')}>
       <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: PRIORITY_TONE[task.priority] }} />
       <input type="checkbox" className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded accent-[rgb(var(--gold-300))]" checked={done}
         aria-label={done ? `Reabrir ${task.title}` : `Concluir ${task.title}`}
         onChange={() => toggleComplete(task).then(() => toast(done ? 'Tarefa reaberta.' : 'Tarefa concluída.')).catch((e) => toast(e.message, 'erro'))} />
       <div className="min-w-0 flex-1">
         <button type="button" onClick={() => onOpen(task)} className={cn('text-left text-sm font-medium leading-snug hover:text-gold', done && 'text-muted line-through')}>{task.title}</button>
-        <div className="mt-1.5"><TaskMeta task={task} compact={compact} /></div>
+        {minimal ? <TaskMetaMinimal task={task} /> : <div className="mt-1.5"><TaskMeta task={task} compact={compact} /></div>}
       </div>
       {onMission && !done && (
         <button type="button" onClick={() => onMission(task)} aria-pressed={inMission} aria-label={inMission ? 'Remover da missão do dia' : 'Adicionar à missão do dia'}
