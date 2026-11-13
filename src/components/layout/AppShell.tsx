@@ -14,6 +14,7 @@ import { useAuth } from '@/app/auth';
 import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { GlobalSearch } from '@/features/search/GlobalSearch';
+import { useNotionAutoSync } from '@/features/notion/autoSync';
 import { Loading } from '@/components/ui/misc';
 
 function Brand() {
@@ -109,6 +110,7 @@ function ThemeToggle() {
 
 export function AppShell() {
   useAppIcon(); // logo personalizada também na aba e no atalho da tela inicial
+  useNotionAutoSync(); // lê o Notion sozinha (só leitura) enquanto o app está aberto
   React.useEffect(() => { prefetchIdle(); }, []); // código das telas leves, com o navegador ocioso
   const [open, setOpen] = React.useState(false);
   const loc = useLocation();

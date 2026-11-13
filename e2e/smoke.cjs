@@ -200,6 +200,19 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   ok(await p.locator('text=Status desconhecido: "Backlog"').count() === 1, 'status desconhecido vai para revisão (sem valor padrão)');
   ok(await p.locator('li:has-text("KR sem objetivo") >> text=KR sem Objetivo').count() >= 1, 'KR sem Objetivo vai para revisão (sem Objetivo artificial)');
   ok(await p.locator('text=Tarefa de outra pessoa').count() === 0, 'item de outra pessoa não aparece nem na revisão');
+
+  // Leitura automática do Notion (só leitura): com a última leitura "antiga", o app lê sozinho ao abrir
+  const OLD = '2026-01-01T00:00:00.000Z';
+  const setLastSync = (v) => p.evaluate((v) => { const s = JSON.parse(localStorage.getItem('ccc:v1:settings')); s[0].notion_config.last_sync_at = v; localStorage.setItem('ccc:v1:settings', JSON.stringify(s)); localStorage.removeItem('ccc:notion-auto-at'); }, v);
+  const lastSync = () => p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:settings'))[0].notion_config.last_sync_at);
+  await setLastSync(OLD); await p.goto(BASE + '/'); await p.waitForSelector('text=Missão do dia');
+  await p.waitForFunction((old) => JSON.parse(localStorage.getItem('ccc:v1:settings'))[0].notion_config.last_sync_at > old, OLD, { timeout: 15000 }).catch(() => {});
+  ok(await lastSync() > OLD, 'leitura automática roda sozinha ao abrir o app');
+  await p.goto(BASE + '/integracoes'); await p.waitForSelector('text=Ler do Notion automaticamente');
+  await p.click('text=Ler do Notion automaticamente'); await p.waitForSelector('text=Leitura automática desligada');
+  await setLastSync(OLD); await p.goto(BASE + '/'); await p.waitForSelector('text=Missão do dia'); await p.waitForTimeout(6000);
+  ok(await lastSync() === OLD, 'leitura automática desligada não lê sozinha');
+  await p.goto(BASE + '/integracoes'); await p.click('text=Ler do Notion automaticamente'); await p.waitForSelector('text=Leitura automática ligada');
   // Itens pessoais do Notion aparecem mesmo com filtro de instituição
   await p.goto(BASE + '/tarefas');
   await p.selectOption('select[aria-label="Filtrar por instituição"]', { label: 'CPPEM' });

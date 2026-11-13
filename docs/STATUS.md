@@ -36,6 +36,7 @@
 - **Quadros iguais aos do Notion**: OKRs em "Kanban por Objetivo" (colunas = Objetivos, só KRs ativos, status no cartão)
   e Tarefas agrupadas por ATRIBUIÇÃO (70% / 20% / 10% / OFF WORK, só ativas) ou por status com os nomes do Notion.
 
+- **Notion lido automaticamente**: ao abrir o app, ao voltar para ele e a cada 10 minutos (liga/desliga em Integrações). Só leitura — o envio continua manual, com confirmação.
 - **Busca em tudo** (lupa no topo ou Ctrl+K): tarefas, pessoas, reuniões, agenda, OKRs, projetos, treinamentos e anotações, na instituição escolhida; abre o item encontrado. Feedbacks ficam de fora (podem ter PIN).
 - **Telas enxutas**: Rotina (uma linha por bloco, círculo para concluir, menu "⋯"), Agenda (semana em lista no celular; excluir dentro do evento), OKRs (filtros recolhidos, cartão menor, abas no celular), Equipes (uma linha por pessoa; excluir dentro da pessoa) e Configurações em abas (Geral, Jornada, Organização, Dados).
 - **Rotina**: "Dia de folga" apaga o dia e a tela Hoje não recria a rotina-base (migration 0008); mudar o intervalo na Jornada move o bloco "Intervalo" do modelo de rotina junto.

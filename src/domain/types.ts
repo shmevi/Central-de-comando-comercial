@@ -338,6 +338,8 @@ export interface NotionConfig {
   objectives_data_source_id: string;
   cursors: Partial<Record<NotionSyncEntity, string | null>>;
   last_sync_at: string | null;
+  /** Leitura automática (ao abrir, ao voltar e a cada 10 min). Ausente = ligada. */
+  auto_sync?: boolean;
 }
 
 /** Entradas manuais dos relatórios. 'prioridade' usa a segunda-feira da semana a que se refere. */

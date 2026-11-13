@@ -8,7 +8,8 @@ import { useConfirm } from '@/components/ui/dialog';
 import { Checkbox, SelectField, TextField } from '@/components/ui/form';
 import { useToast } from '@/components/ui/toast';
 import { MOCK_NOTION_CONFIG } from '@/integrations/notion/mockAdapter';
-import { chooseObjective, discardReview, resolveConflict, syncNotion } from '@/integrations/notion/sync';
+import { chooseObjective, discardReview, resolveConflict } from '@/integrations/notion/sync';
+import { AUTO_SYNC_MINUTES, runNotionSync, useNotionSyncing } from '@/features/notion/autoSync';
 import { notionReader } from '@/features/notion/connection';
 import { PushBanner } from '@/features/notion/PushPanel';
 import { ACTIVE_STATUS_GROUPS, PROPS, REQUIRED_NOTION_FIELDS, TASK_PRIORITY_MAP, TASK_STATUS_MAP, checkNotionConfig, describeConfigProblem, isNotionId, normalizePageId, resolveNotionConfig } from '@/integrations/notion/config';
@@ -106,13 +107,10 @@ export default function Integracoes() {
   const { settings, save } = useSettings();
   const logs = useCollection('sync_logs');
   const queue = useCollection('review_queue');
-  const states = useCollection('notion_sync_state');
-  const tasks = useCollection('tasks');
-  const objectives = useCollection('objectives');
   const toast = useToast();
   const { confirm, confirmNode } = useConfirm();
   const [tab, setTab] = React.useState<'conexao' | 'mapeamento' | 'revisao' | 'conflitos' | 'log'>('conexao');
-  const [syncing, setSyncing] = React.useState(false);
+  const syncing = useNotionSyncing();
   const cfg = resolveNotionConfig(settings);
   const cfgCheck = checkNotionConfig(cfg);
   const who = cfg.person_name || 'responsável configurado';
@@ -132,14 +130,14 @@ export default function Integracoes() {
     await save({ notion_write_enabled: v });
   }
   async function runSync() {
-    setSyncing(true);
     try {
-      const c = await syncNotion(adapter, settings, save);
-      await Promise.all([tasks.reload(), objectives.reload(), states.reload(), queue.reload(), logs.reload()]);
+      const c = await runNotionSync(settings, save);
       const rev = c.tarefas.revisao + c.krs.revisao, conf = c.tarefas.conflitos + c.krs.conflitos;
       toast(`Leitura concluída${adapter.isDemo ? ' (demonstração)' : ''}: ${c.tarefas.criados + c.tarefas.atualizados} tarefa(s) e ${c.krs.criados + c.krs.atualizados} KR(s) importados/atualizados, ${rev} para revisão${conf ? `, ${conf} conflito(s)` : ''}.`);
-    } catch (e) { toast((e as Error).message, 'erro'); } finally { setSyncing(false); }
+    } catch (e) { toast((e as Error).message, 'erro'); }
   }
+  const autoOn = cfg.auto_sync !== false;
+  const toggleAuto = (v: boolean) => save({ notion_config: { ...cfg, auto_sync: v } }).then(() => toast(v ? `Leitura automática ligada (a cada ${AUTO_SYNC_MINUTES} min com o app aberto).` : 'Leitura automática desligada.'));
 
   return (
     <div>
@@ -171,7 +169,11 @@ export default function Integracoes() {
               <p role="alert" className="rounded-lg border border-danger/60 p-2 text-xs text-danger">Configuração incompleta — {describeConfigProblem(cfgCheck)}. Preencha em <strong>Campos</strong>. A sincronização fica bloqueada até lá.</p>
             )}
             <Button onClick={runSync} disabled={!settings.notion_enabled || syncing || !cfgCheck.ok}><RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />{syncing ? 'Lendo…' : 'Sincronizar (somente leitura)'}</Button>
-            <p className="text-xs text-muted">Última leitura: {cfg.last_sync_at ? fmtDateTime(cfg.last_sync_at) : 'nunca'}</p>
+            <div className="rounded-lg border border-border p-3">
+              <Checkbox label="Ler do Notion automaticamente" checked={autoOn} disabled={!settings.notion_enabled} onChange={toggleAuto} />
+              <p className="mt-1 text-xs text-muted">Ao abrir o app, ao voltar para ele e a cada {AUTO_SYNC_MINUTES} minutos com ele aberto. Só leitura: o envio para o Notion continua manual, com confirmação.</p>
+            </div>
+            <p className="text-xs text-muted">Última leitura: {cfg.last_sync_at ? fmtDateTime(cfg.last_sync_at) : 'nunca'}{settings.notion_enabled && autoOn && cfgCheck.ok ? ` · automática a cada ${AUTO_SYNC_MINUTES} min` : ''}</p>
           </Card>
           <Card className="p-5 text-sm">
             <h2 className="mb-3 font-display text-base font-semibold tracking-wide">Como funciona</h2>

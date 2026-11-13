@@ -31,7 +31,8 @@ export const readerFromAdapter = (adapter: NotionAdapter): NotionReader => ({
   read: async (config, states) => ({ read: await readNotion(adapter, config, states, { bodies: true }), person_id: config.person_id }),
 });
 
-export async function syncNotion(source: NotionAdapter | NotionReader, settings: Settings, saveSettings?: (patch: Partial<Settings>) => Promise<unknown>): Promise<SyncSummary> {
+/** opts.quiet (leitura automática): não grava a linha de resumo no log quando nada mudou. */
+export async function syncNotion(source: NotionAdapter | NotionReader, settings: Settings, saveSettings?: (patch: Partial<Settings>) => Promise<unknown>, opts: { quiet?: boolean } = {}): Promise<SyncSummary> {
   const reader: NotionReader = 'query' in source ? readerFromAdapter(source) : source;
   const config = resolveNotionConfig(settings);
   // Fail-closed: sem todos os IDs obrigatórios não há consulta nenhuma (e nenhum valor padrão é usado).
@@ -56,7 +57,7 @@ export async function syncNotion(source: NotionAdapter | NotionReader, settings:
       notion: { tarefas: got.read.tarefas, krs: got.read.krs, objetivos: got.read.objetivos }, missing: got.read.missing,
       local: { tasks, objectives, states, reviews },
     });
-    await applyPlan(plan, states, reader.isDemo);
+    await applyPlan(plan, states, reader.isDemo, opts.quiet);
     await saveSettings?.({ notion_config: { ...effective, last_sync_at: startedAt } });
     return { ...plan.counts, person_id: effective.person_id };
   } catch (e) {
@@ -71,7 +72,7 @@ export async function syncNotion(source: NotionAdapter | NotionReader, settings:
  * mesmo tempo) — antes era uma requisição por vez (dezenas de idas e voltas numa sincronização).
  * Várias alterações do mesmo registro são juntadas numa só, para respostas fora de ordem não se sobrescreverem.
  */
-async function applyPlan(plan: SyncPlan, states: NotionSyncState[], isDemo: boolean) {
+async function applyPlan(plan: SyncPlan, states: NotionSyncState[], isDemo: boolean, quiet = false) {
   await Promise.all([actions.createMany('tasks', plan.taskCreates), actions.createMany('objectives', plan.objectiveCreates)]);
   await Promise.all([
     pool(mergeById(plan.taskUpdates), 6, (u) => actions.update('tasks', u.id, u.patch)),
@@ -80,6 +81,7 @@ async function applyPlan(plan: SyncPlan, states: NotionSyncState[], isDemo: bool
   await upsertStates(plan.states, states, isDemo);
   await actions.createMany('review_queue', plan.reviews);
   const c = plan.counts;
+  if (quiet && plan.logs.length === 0) return; // leitura automática sem novidade: não enche o log
   await actions.createMany('sync_logs', [...plan.logs.map((l) => ({
     source: 'notion', direction: 'leitura', entity: l.entity, external_id: l.external_id, fields_changed: l.fields_changed, is_demo_source: isDemo,
     status: l.action === 'conflito' || l.action === 'revisao' || l.action === 'suspenso' ? 'revisao' : 'sucesso',

@@ -50,6 +50,7 @@ Legenda: **[A]** coberto por teste automático (`npm test` ou `npm run test:e2e`
 - [A] Modo Supabase: logo no Storage na pasta do usuário; outro usuário não herda; conquistas em report_entries
 - [A] Storage/RLS (PostgreSQL): bucket privado com limite e tipos; ninguém lê/grava/apaga a pasta de outro usuário
 - [M] Fonte Capture It aparece nos títulos (páginas e cartões); o restante do texto (menus, tabelas, formulários e botões) usa Inter; símbolos que ela não tem (—, º, setas) aparecem na fonte reserva
+- [M] Notion: com a leitura ativa, a Central lê sozinha ao abrir/voltar e a cada 10 min; "Ler do Notion automaticamente" desligado não lê; nada é enviado ao Notion sem confirmação
 - [M] Busca (lupa/Ctrl+K): acha tarefa, pessoa, reunião, evento, OKR/KR; Enter abre o item; respeita a instituição do topo; feedbacks não aparecem
 - [M] Rotina: círculo conclui o bloco; "⋯" muda status/edita/exclui; "Dia de folga" apaga o dia e Hoje não recria; mudar o intervalo na Jornada move o bloco do modelo
 - [M] Agenda no celular: semana em lista; tocar no evento edita; Excluir dentro do evento

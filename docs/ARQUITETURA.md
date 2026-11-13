@@ -143,6 +143,13 @@ Tokens em `src/styles/tokens.css` (canais RGB, consumidos pelo Tailwind em `tail
 
 ## Integração Notion (Notion → Central, somente leitura)
 
+**Leitura automática** (`src/features/notion/autoSync.ts`, montada no `AppShell`): com a leitura ativada, a configuração
+completa e a opção "Ler do Notion automaticamente" ligada (`notion_config.auto_sync`, padrão ligada), a Central lê o
+Notion ao abrir, ao voltar para o app e a cada 10 minutos com ele aberto — só se a última leitura tiver mais de 10 minutos.
+Uma leitura por vez (o botão e a automática dividem a mesma trava; entre abas, um carimbo no localStorage). A automática é
+silenciosa: só avisa quando surge item novo para revisar e não grava a linha de resumo no log quando nada mudou.
+O código da sincronização só é baixado na hora da leitura. O **envio** para o Notion continua manual, com confirmação.
+
 Escopo: **Tarefas e KRs/OKRs de um responsável**, identificado pelo **ID estável do usuário no Notion** — nunca
 pelo nome. O ID do responsável e os IDs das bases ficam **só** em `settings.notion_config` (tela Integrações → Campos);
 não há valor padrão no código. Faltando qualquer um, a sincronização não roda (fail-closed). Reuniões não fazem parte da integração. Arquivos em `src/integrations/notion/`:
