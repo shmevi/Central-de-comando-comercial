@@ -1,8 +1,10 @@
 import * as React from 'react';
-import { FileText, Pencil, Plus, Target, Trash2 } from 'lucide-react';
+import { ChevronDown, FileText, Pencil, Plus, SlidersHorizontal, Target, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
-import { PageHeader, Loading, ErrorState, EmptyState, Card, Badge, DemoBadge, NotionBadge, Progress, Segmented, FilterBar } from '@/components/ui/misc';
+import { PageHeader, Loading, ErrorState, EmptyState, Card, Badge, DemoBadge, NotionBadge, Progress, Segmented } from '@/components/ui/misc';
 import { KanbanBoard } from '@/components/ui/kanban';
 import { PushBanner } from '@/features/notion/PushPanel';
 import { KR_STATUS, KR_STATUS_OPTIONS, krColumnOf, type KrColumn } from '@/integrations/notion/config';
@@ -178,18 +180,19 @@ function KrCardView({ c, onEdit, showObjective, onStatus }: { c: KrCard; onEdit:
     <div className="space-y-2 pr-4">
       <button type="button" onClick={onEdit} className="text-left text-sm font-medium leading-snug hover:text-gold">{k.title}</button>
       {showObjective && <div className="truncate text-[11px] text-muted" title={o.title}>{o.title}</div>}
-      <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted">
-        {o.owner && <span className="chip border-border" title="Dono">{o.owner}</span>}
-        {(k.description || k.reason || k.notion_body) && <span className="chip border-border" title="Tem descrição/conteúdo no Notion — clique no KR para ler"><FileText size={11} aria-hidden />Descrição</span>}
-        <span className="chip border-border" title="Período">{period(k) ?? 'Sem período'}</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+        {o.owner && <span title="Dono">{o.owner}</span>}
+        {period(k) && <span title="Período">{period(k)}</span>}
+        {(k.description || k.reason || k.notion_body) && <FileText size={12} aria-label="Tem descrição no Notion — toque no KR para ler" />}
         {k.external_ref && <NotionBadge />}{o.is_demo && <DemoBadge />}
       </div>
       <div className="flex items-center justify-between text-xs"><span className="text-muted">{k.target != null ? `${k.current ?? '—'} / ${k.target} ${k.unit}` : 'meta não definida'}</span><span className="text-gold" title="Progresso">{pv != null ? `${pv}%` : '—'}</span></div>
       {pv != null && <Progress className="h-1.5" value={pv} label={`Progresso de ${k.title}`} />}
       {onStatus ? (
-        <label className="block">
+        <label className={cn('relative inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] focus-within:outline focus-within:outline-2 focus-within:outline-gold-300/60', toneChip(tone))}>
           <span className="sr-only">Status de {k.title}</span>
-          <select className={cn('field h-7 rounded-lg px-2 py-0 text-[11px]', toneChip(tone))} value={k.status ?? KR_STATUS.a_caminho} onChange={(e) => onStatus(e.target.value)}>
+          <span className="truncate" aria-hidden>{k.status ?? KR_STATUS.a_caminho}</span><ChevronDown size={12} className="shrink-0" aria-hidden />
+          <select className="absolute inset-0 cursor-pointer opacity-0" value={k.status ?? KR_STATUS.a_caminho} onChange={(e) => onStatus(e.target.value)}>
             {[...new Set([...(k.status && !KR_STATUS_OPTIONS.includes(k.status) ? [k.status] : []), ...KR_STATUS_OPTIONS])].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
@@ -203,8 +206,11 @@ export default function Okrs() {
   const { matchesItem } = useScope();
   const { confirmDelete, confirmNode } = useConfirm();
   const toast = useToast();
+  const [params] = useSearchParams();
   const [cycle, setCycle] = React.useState('');
-  const [objFilter, setObjFilter] = React.useState('');
+  // Vindo da busca: /okrs?objetivo=<id> já filtra o objetivo
+  const [objFilter, setObjFilter] = React.useState(params.get('objetivo') ?? '');
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [view, setView] = React.useState<View>(() => { try { const v = localStorage.getItem('ccc:okr-view'); return v === 'kanban' || v === 'lista' ? v : 'objetivos'; } catch { return 'objetivos'; } });
   /** Como no Notion: só KRs ativos (A caminho / ??), a não ser que se peça o contrário. */
   const [showClosed, setShowClosed] = React.useState(false);
@@ -219,6 +225,12 @@ export default function Okrs() {
   const objColumns = [...new Set(objCards.map((c) => c.o.id))].map((id) => list.find((o) => o.id === id)!)
     .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
     .map((o) => ({ value: o.id, label: o.title, tone: isFromNotion(o) ? 'rgb(var(--gold-300))' : 'rgb(var(--muted))' }));
+  const krCount = list.reduce((n, o) => n + o.key_results.length, 0);
+  const active = [
+    ...(cycle ? [{ key: 'ciclo', label: `Ciclo: ${cycle}`, clear: () => setCycle('') }] : []),
+    ...(objFilter && view !== 'lista' ? [{ key: 'obj', label: `Objetivo: ${list.find((o) => o.id === objFilter)?.title ?? '—'}`, clear: () => setObjFilter('') }] : []),
+    ...(showClosed && view === 'objetivos' ? [{ key: 'enc', label: 'Com KRs encerrados', clear: () => setShowClosed(false) }] : []),
+  ];
   async function setStatus(c: KrCard, s: string) {
     if (s === c.k.status) return;
     try { await saveKr(c.o, c.k.id, { status: s }); toast(c.k.external_ref ? `“${c.k.title}” → ${s} na Central. Envie ao Notion pelo aviso no topo.` : 'Status do KR atualizado.'); }
@@ -237,24 +249,34 @@ export default function Okrs() {
   const empty = <EmptyState icon={<Target />} title="Nenhum OKR" description="Defina objetivos por instituição ou sincronize os do Notion em Integrações." action={<Button onClick={() => setCreating(true)}><Plus size={16} />Objetivo</Button>} />;
   return (
     <div>
-      <PageHeader title="OKRs" eyebrow="Estratégia" subtitle={`${list.length} objetivo(s) · ${list.reduce((n, o) => n + o.key_results.length, 0)} KR(s) · os do Notion são pessoais`}
-        actions={<><Segmented label="Visualização" value={view} onChange={setView} options={[{ value: 'objetivos', label: 'Kanban por Objetivo' }, { value: 'kanban', label: 'Por status' }, { value: 'lista', label: 'Lista' }]} />
+      <PageHeader title="OKRs" eyebrow="Estratégia" subtitle={`${list.length} ${list.length === 1 ? 'objetivo' : 'objetivos'} · ${krCount} ${krCount === 1 ? 'KR' : 'KRs'}`}
+        actions={<><Segmented label="Visualização" value={view} onChange={setView} options={[{ value: 'objetivos', label: 'Por objetivo' }, { value: 'kanban', label: 'Por status' }, { value: 'lista', label: 'Lista' }]} />
           <Button onClick={() => setCreating(true)}><Plus size={16} />Objetivo</Button></>} />
       <PushBanner entity="krs" />
-      <FilterBar>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SelectField label="Ciclo" value={cycle} onChange={(e) => setCycle(e.target.value)} options={cycles.map((c) => ({ value: c, label: c || 'Sem ciclo' }))} placeholder="Todos" />
-          {view !== 'lista' && <SelectField className="lg:col-span-2" label="Objetivo (tópico)" value={objFilter} onChange={(e) => setObjFilter(e.target.value)} options={list.map((o) => ({ value: o.id, label: o.title }))} placeholder="Todos os objetivos" />}
+      <div className="mb-4 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" aria-expanded={filtersOpen} aria-controls="filtros-okrs" onClick={() => setFiltersOpen((o) => !o)}>
+            <SlidersHorizontal size={14} />Filtros{active.length > 0 && <span className="rounded-full bg-gold-300/20 px-1.5 text-xs tabular-nums text-gold">{active.length}</span>}
+          </Button>
+          {active.map((f) => <FilterChip key={f.key} onClear={f.clear}>{f.label}</FilterChip>)}
         </div>
-        {view === 'objetivos' && <Checkbox className="self-start text-xs text-muted" label="Mostrar KRs encerrados (no Notion este quadro mostra só os ativos)" checked={showClosed} onChange={setShowClosed} />}
-      </FilterBar>
+        {filtersOpen && (
+          <div id="filtros-okrs" className="card grid gap-3 p-3 sm:p-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <SelectField label="Ciclo" value={cycle} onChange={(e) => setCycle(e.target.value)} options={cycles.map((c) => ({ value: c, label: c || 'Sem ciclo' }))} placeholder="Todos" />
+              {view !== 'lista' && <SelectField className="lg:col-span-2" label="Objetivo (tópico)" value={objFilter} onChange={(e) => setObjFilter(e.target.value)} options={list.map((o) => ({ value: o.id, label: o.title }))} placeholder="Todos os objetivos" />}
+            </div>
+            {view === 'objetivos' && <Checkbox className="self-start text-xs text-muted" label="Mostrar KRs encerrados (no Notion este quadro mostra só os ativos)" checked={showClosed} onChange={setShowClosed} />}
+          </div>
+        )}
+      </div>
       {objectives.error ? <ErrorState message={objectives.error} onRetry={objectives.reload} /> : objectives.loading ? <Loading /> : list.length === 0 ? empty :
         view === 'kanban' ? (
-          <KanbanBoard columns={KR_COLUMNS} items={cards} columnOf={(c) => krColumnOf(c.k.status)} onMove={move} itemLabel={(c) => c.k.title} emptyText="Arraste KRs para cá"
+          <KanbanBoard mobileTabs columns={KR_COLUMNS} items={cards} columnOf={(c) => krColumnOf(c.k.status)} onMove={move} itemLabel={(c) => c.k.title} emptyText="Arraste KRs para cá"
             renderCard={(c) => <KrCardView c={c} showObjective onEdit={() => setKrEdit({ card: c, statusOnly: null })} />} />
         ) : view === 'objetivos' ? (
           objColumns.length === 0 ? <EmptyState icon={<Target />} title="Nenhum KR ativo" description="Marque “Mostrar KRs encerrados” para ver os concluídos e os não atingidos." /> :
-          <KanbanBoard readOnly columns={objColumns}
+          <KanbanBoard readOnly mobileTabs columns={objColumns}
             items={objCards} columnOf={(c) => c.o.id} onMove={() => {}} itemLabel={(c) => c.k.title} emptyText="Nenhum KR neste objetivo"
             renderCard={(c) => <KrCardView c={c} onEdit={() => setKrEdit({ card: c, statusOnly: null })} onStatus={(s) => setStatus(c, s)} />} />
         ) : (

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { actions, useCollection } from '@/data/store';
 import { useNow, useSettings } from '@/app/hooks';
@@ -34,6 +35,8 @@ function useAgendaItems() {
 function EventDialog({ open, onOpenChange, event, date, all }: { open: boolean; onOpenChange: (o: boolean) => void; event: AgendaEvent | null; date: string; all: Item[] }) {
   const toast = useToast();
   const { workday } = useSettings();
+  const { confirmDelete, confirmNode } = useConfirm();
+  const remove = () => event && confirmDelete('Excluir evento', `“${event.title}”`, async () => { await actions.remove('agenda_events', event.id); toast('Evento excluído.'); onOpenChange(false); });
   const empty = (): Omit<AgendaEvent, 'id' | 'created_at' | 'updated_at'> => ({ title: '', date, start: '', end: '', kind: 'compromisso', institution_id: null, location: '', notes: '', external_synced: false });
   const { d, set, err, setErr } = useDraft(open, () => event ? { ...event } : empty(), [event, date]);
   const valid = d.date && d.start && d.end && toMin(d.end) > toMin(d.start);
@@ -49,7 +52,8 @@ function EventDialog({ open, onOpenChange, event, date, all }: { open: boolean; 
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={event ? 'Editar evento' : 'Novo evento'} description="Agenda interna — nenhum evento é criado em calendários externos."
-      footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save}>Salvar</Button></>}>
+      footer={<>{event && <Button variant="ghost" className="mr-auto text-danger hover:text-danger" onClick={remove}><Trash2 size={15} />Excluir</Button>}<Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save}>Salvar</Button></>}>
+      {confirmNode}
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField className="sm:col-span-2" label="Título" required value={d.title} onChange={(e) => set('title', e.target.value)} error={err.title} />
         <TextField label="Data" type="date" required value={d.date} onChange={(e) => set('date', e.target.value)} error={err.date} />
@@ -85,11 +89,13 @@ export default function Agenda() {
   const now = useNow();
   const { settings } = useSettings();
   const { items, loading } = useAgendaItems();
-  const [view, setView] = React.useState<'dia' | 'semana' | 'mes'>('semana');
-  const [date, setDate] = React.useState(now.date);
+  const [params] = useSearchParams();
+  // Vindo da busca: /agenda?data=yyyy-mm-dd abre o dia
+  const qDate = params.get('data');
+  const [view, setView] = React.useState<'dia' | 'semana' | 'mes'>(qDate ? 'dia' : 'semana');
+  const [date, setDate] = React.useState(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : now.date);
   const [editing, setEditing] = React.useState<AgendaEvent | null>(null);
   const [creating, setCreating] = React.useState<string | null>(null);
-  const { confirmDelete, confirmNode } = useConfirm();
   const conflicts = conflictingIds(items.filter((i) => !i.tentative));
   const onItem = (i: Item) => (i.ref ? () => setEditing(i.ref!) : undefined);
   const dayItems = (d: string) => items.filter((i) => i.date === d).sort((a, b) => a.start.localeCompare(b.start));
@@ -106,7 +112,7 @@ export default function Agenda() {
         onPrev={() => setDate(view === 'mes' ? shiftMonth(date, -1) : addDays(date, -step))}
         onNext={() => setDate(view === 'mes' ? shiftMonth(date, 1) : addDays(date, step))}>
         {totalConflicts > 0 && <span className="chip border-danger/60 text-danger"><AlertTriangle size={12} />{totalConflicts} item(ns) em conflito</span>}
-        <span className="ml-auto flex flex-wrap gap-2 text-xs text-muted">
+        <span className="ml-auto hidden flex-wrap gap-2 text-xs text-muted sm:flex">
           <span className="chip border-gold-300/50">Evento</span><span className="chip border-orange/50">Reunião</span>
         </span>
       </DateNav>
@@ -117,19 +123,41 @@ export default function Agenda() {
           {dayItems(date).length === 0 ? <EmptyState title="Dia livre" description="Nenhum compromisso nesta data." action={<Button size="sm" onClick={() => setCreating(date)}><Plus size={14} />Evento</Button>} /> : (
             <ul className="space-y-2">
               {dayItems(date).map((i) => (
-                <li key={i.id} className={cn('flex items-center gap-3 rounded-lg border p-3', conflicts.has(i.id) ? 'border-danger/60' : 'border-border')}>
-                  <span className="w-28 font-mono text-sm">{i.tentative ? 'A confirmar' : `${i.start}–${i.end}`}</span>
-                  <div className="min-w-0 flex-1"><div className="font-semibold">{i.title} {i.is_demo && <DemoBadge />}</div><div className="flex gap-1 text-xs text-muted">{i.kind} <InstitutionBadge id={i.institution_id} /></div></div>
-                  {conflicts.has(i.id) && <span className="chip border-danger/60 text-danger">Conflito</span>}
-                  {i.ref && <Button variant="ghost" size="icon" aria-label={`Excluir ${i.title}`} onClick={() => confirmDelete('Excluir evento', `“${i.title}”`, () => actions.remove('agenda_events', i.id))}><Trash2 size={15} /></Button>}
-                  {i.ref && <Button variant="ghost" size="sm" onClick={() => setEditing(i.ref!)}>Editar</Button>}
+                <li key={i.id}>
+                  <button type="button" disabled={!i.ref} onClick={() => i.ref && setEditing(i.ref)}
+                    className={cn('flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition', conflicts.has(i.id) ? 'border-danger/60' : 'border-border/70', i.ref && 'hover:border-border hover:bg-surface-2')}>
+                    <span aria-hidden className={cn('h-8 w-1 shrink-0 rounded-full', i.source === 'reuniao' ? 'bg-orange' : 'bg-gold-300')} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">{i.title} {i.is_demo && <DemoBadge />}</div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted"><span className="tabular-nums">{i.tentative ? 'A confirmar' : `${i.start}–${i.end}`}</span><span>{i.kind}</span>{i.institution_id && <InstitutionBadge id={i.institution_id} />}</div>
+                    </div>
+                    {conflicts.has(i.id) && <span className="chip border-danger/60 text-danger">Conflito</span>}
+                  </button>
                 </li>
               ))}
             </ul>
           )}
         </Card>
-      ) : view === 'semana' ? (
-        <div className="relative -mx-4 overflow-x-auto px-4 pb-2">
+      ) : view === 'semana' ? (<>
+        {/* Celular: lista de dias (sem rolar para o lado) */}
+        <ol className="space-y-2 sm:hidden">
+          {weekDates(date).map((d) => {
+            const list = dayItems(d);
+            return (
+              <li key={d} className={cn('card px-3 py-2', d === now.date && 'border-gold-300/60', isWeekend(d) && list.length === 0 && 'opacity-60')} aria-label={fmtLongDate(d)}>
+                <div className="flex items-center justify-between gap-2">
+                  <button type="button" onClick={() => { setDate(d); setView('dia'); }} className="min-w-0 text-left">
+                    <span className="font-display text-sm tracking-wide">{WEEKDAYS_SHORT[weekdayOf(d)]} {fmtDate(d).slice(0, 5)}</span>
+                    <span className="ml-2 text-xs text-muted">{isWeekend(d) ? 'Sem expediente' : [focus(d), list.length ? null : 'livre'].filter(Boolean).join(' · ')}</span>
+                  </button>
+                  {!isWeekend(d) && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCreating(d)} aria-label={`Novo evento em ${fmtDate(d)}`}><Plus size={15} /></Button>}
+                </div>
+                {list.length > 0 && <ul className="mt-2 space-y-1">{list.map((i) => <li key={i.id}><ItemChip i={i} conflict={conflicts.has(i.id)} onClick={onItem(i)} /></li>)}</ul>}
+              </li>
+            );
+          })}
+        </ol>
+        <div className="relative -mx-4 hidden overflow-x-auto px-4 pb-2 sm:block">
           <div className="grid min-w-[980px] grid-cols-7 gap-2">
             {weekDates(date).map((d) => (
               <section key={d} className={cn('card flex min-h-[260px] flex-col p-2', d === now.date && 'border-gold-300', isWeekend(d) && 'opacity-70')} aria-label={fmtLongDate(d)}>
@@ -143,7 +171,7 @@ export default function Agenda() {
             ))}
           </div>
         </div>
-      ) : (
+      </>) : (
         <div className="relative -mx-4 overflow-x-auto px-4">
           <div className="grid min-w-[700px] grid-cols-7 gap-1">
             {WEEKDAYS_SHORT.slice(1).concat('Dom').map((w) => <div key={w} className="p-1 text-center text-xs font-semibold uppercase text-muted">{w}</div>)}
@@ -163,7 +191,6 @@ export default function Agenda() {
         </div>
       )}
       <EventDialog open={creating !== null || !!editing} event={editing} date={creating ?? date} all={items} onOpenChange={(o) => { if (!o) { setCreating(null); setEditing(null); } }} />
-      {confirmNode}
     </div>
   );
 }

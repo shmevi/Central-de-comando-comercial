@@ -143,6 +143,48 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   ok(await p.locator('role=dialog >> text=invade o intervalo').isVisible(), 'bloco no intervalo exige exceção explícita');
   await p.keyboard.press('Escape');
 
+  // Rotina: concluir pelo círculo e menu "⋯" (status)
+  const firstWork = p.locator('ol > li:not(:has-text("Intervalo"))').first();
+  const blockTitle = (await firstWork.locator('button').nth(1).innerText()).trim();
+  await firstWork.locator(`button[aria-label="Concluir ${blockTitle}"]`).click(); await p.waitForTimeout(250);
+  ok(await p.locator(`button[aria-label="Desmarcar ${blockTitle}"]`).count() === 1, 'rotina: concluir bloco pelo círculo');
+  await p.locator(`label:has-text("Ações de ${blockTitle}") select`).selectOption('st:em_andamento'); await p.waitForTimeout(250);
+  ok(await p.evaluate((t) => JSON.parse(localStorage.getItem('ccc:v1:routine_blocks') || '[]').some((b) => b.title === t && b.status === 'em_andamento'), blockTitle), 'rotina: menu "⋯" muda o status');
+
+  // Rotina: dia de folga apaga o dia e a tela Hoje NÃO recria a rotina-base
+  await p.click('button:has-text("Dia de folga")'); await p.click('role=dialog >> button:has-text("Marcar folga")'); await p.waitForTimeout(400);
+  ok(await p.locator('text=Protegido').count() === 0, 'dia de folga apaga todos os blocos (inclusive o intervalo)');
+  await p.goto(BASE + '/'); await p.waitForSelector('text=Missão do dia'); await p.waitForTimeout(800);
+  await p.goto(BASE + '/rotina'); await p.waitForTimeout(500);
+  ok(await p.locator('text=Protegido').count() === 0 && await p.locator('button:has-text("Gerar rotina do dia")').count() === 1, 'dia de folga: a rotina-base não volta sozinha ao abrir Hoje');
+  await p.click('button:has-text("Gerar rotina do dia")'); await p.waitForSelector('text=Protegido');
+  ok(true, 'gerar de novo desfaz a folga');
+
+  // Jornada: mudar o intervalo move o bloco "Intervalo" do modelo de rotina
+  await p.goto(BASE + '/configuracoes?aba=jornada'); await p.waitForSelector('text=Modelo de rotina');
+  const breakOf = () => p.evaluate(() => JSON.parse(localStorage.getItem('ccc:v1:routine_templates') || '[]').flatMap((t) => t.blocks).find((b) => b.is_break));
+  const orig = await breakOf();
+  await p.fill('label:has-text("Início do intervalo") >> xpath=following-sibling::input', '18:30');
+  await p.fill('label:has-text("Fim do intervalo") >> xpath=following-sibling::input', '19:30');
+  await p.click('button:has-text("Salvar jornada")'); await p.waitForTimeout(500);
+  const moved = await breakOf();
+  ok(moved.start === '18:30' && moved.end === '19:30', `intervalo do modelo acompanha a Jornada (${moved.start}–${moved.end})`);
+  await p.fill('label:has-text("Início do intervalo") >> xpath=following-sibling::input', orig.start);
+  await p.fill('label:has-text("Fim do intervalo") >> xpath=following-sibling::input', orig.end);
+  await p.click('button:has-text("Salvar jornada")'); await p.waitForTimeout(500);
+  ok((await breakOf()).start === orig.start, 'intervalo volta ao original');
+
+  // Busca global: lupa no topo → resultado → abre a tarefa
+  await p.click('button[aria-label^="Buscar em tudo"]');
+  await p.fill('#busca-global', 'entrevistas registrar'); await p.waitForSelector('[role=option]:has-text("Realizar entrevistas e registrar decisões")');
+  ok(await p.locator('#busca-global-resultados >> text=Tarefas').count() >= 1, 'busca global agrupa por tipo');
+  await p.keyboard.press('Enter'); await p.waitForSelector('role=dialog >> text=Editar tarefa');
+  ok(new URL(p.url()).pathname === '/tarefas', 'busca global abre a tarefa encontrada');
+  await p.keyboard.press('Escape');
+  await p.keyboard.press('Control+k'); await p.waitForSelector('#busca-global');
+  await p.fill('#busca-global', 'zzzz nada'); await p.waitForSelector('text=Nada encontrado');
+  ok(true, 'Ctrl+K abre a busca; sem resultado mostra aviso'); await p.keyboard.press('Escape');
+
   // Notion mock
   await p.goto(BASE + '/integracoes');
   await p.click('text=Ativar leitura (tarefas e OKRs)');
@@ -191,20 +233,20 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
   const desc = p.locator('role=dialog >> textarea');
   ok((await desc.inputValue()).includes('Conferir as etapas do funil') && await desc.getAttribute('readonly') !== null, 'tarefa do Notion mostra o conteúdo da página (somente leitura)');
   await p.keyboard.press('Escape');
-  await p.goto(BASE + '/okrs'); await p.waitForSelector('text=Kanban por Objetivo');
+  await p.goto(BASE + '/okrs'); await p.waitForSelector('role=radio[name="Por objetivo"]');
   await p.click('section[aria-label] button:has-text("[Demonstração] KR normal")');
   ok(await p.locator('role=dialog >> text=Matrículas do trimestre').count() === 1 && await p.locator('role=dialog >> text=Como medir').count() === 1, 'KR mostra Descrição e conteúdo da página do Notion');
   await p.keyboard.press('Escape');
   ok(await p.locator('text=Conteúdo privado de outra pessoa').count() === 0, 'conteúdo de página de outra pessoa não chega à Central');
 
   // OKRs: "Kanban por Objetivo" como no Notion (colunas = Objetivos, só KRs ativos), status no cartão e envio com confirmação
-  await p.goto(BASE + '/okrs'); await p.waitForSelector('text=Kanban por Objetivo');
+  await p.goto(BASE + '/okrs'); await p.waitForSelector('role=radio[name="Por objetivo"]');
   ok(await p.locator('section[aria-label="[Demonstração] Objetivo compartilhado"]').count() === 1, 'OKRs: uma coluna por Objetivo');
   ok(await p.locator('section[aria-label] li:has-text("KR normal")').count() === 1, 'KR ativo aparece no quadro');
   await p.getByRole('combobox', { name: 'Status de [Demonstração] KR normal' }).selectOption('Não Atingiu - Faltou Pessoas');
   await p.waitForSelector('text=ainda não estão no Notion');
   ok(await p.locator('section[aria-label] li:has-text("KR normal")').count() === 0, 'KR encerrado sai do quadro (só ativos, como no Notion)');
-  await p.click('text=Mostrar KRs encerrados'); await p.waitForTimeout(150);
+  await p.click('button:has-text("Filtros")'); await p.click('text=Mostrar KRs encerrados'); await p.waitForTimeout(150);
   ok(await p.locator('section[aria-label] li:has-text("KR normal")').count() === 1, '"Mostrar encerrados" traz o KR de volta');
   await p.click('button:has-text("Revisar e enviar ao Notion")');
   ok(await p.locator('role=dialog >> text=Status:').count() >= 1 && await p.locator('role=dialog >> text=Não Atingiu - Faltou Pessoas').count() >= 1, 'confirmação mostra o que vai mudar no Notion');
@@ -351,7 +393,8 @@ const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++
         const out = [];
         const vis = (el) => { const st = getComputedStyle(el); const rc = el.getBoundingClientRect(); return st.visibility !== 'hidden' && st.display !== 'none' && rc.width > 0 && rc.height > 0; };
         const main = document.querySelector('main'); if (!main) return out;
-        const controls = [...main.querySelectorAll('select, button, input, textarea, a')].filter(vis);
+        // Seletor nativo invisível por cima de um "chip" (menus ⋯ e status) não esconde texto: o texto É o botão.
+        const controls = [...main.querySelectorAll('select, button, input, textarea, a')].filter(vis).filter((c) => getComputedStyle(c).opacity !== '0');
         const w = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
         for (let n = w.nextNode(); n; n = w.nextNode()) {
           const el = n.parentElement;

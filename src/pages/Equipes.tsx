@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Lock, MessageSquarePlus, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
+import { Lock, MessageSquarePlus, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
@@ -14,12 +14,15 @@ import { useToast } from '@/components/ui/toast';
 import { SearchInput } from '@/components/ui/search';
 import type { Feedback, Person } from '@/domain/types';
 import { fmtDate, todayISO } from '@/lib/time';
-import { nowIso } from '@/lib/utils';
+import { cn, nowIso } from '@/lib/utils';
 import { checkPin } from '@/lib/pin';
 import { MetricsTab } from '@/features/metrics/MetricsTab';
 import { FeedbackMetricsPanel, FeedbackMetricsSummary, hasSnapshot, snapshotFor } from '@/features/metrics/FeedbackMetrics';
 
-function PersonDialog({ open, onOpenChange, person }: { open: boolean; onOpenChange: (o: boolean) => void; person: Person | null }) {
+/** Iniciais para o avatar (até 2 letras). */
+const initials = (name: string) => name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+
+function PersonDialog({ open, onOpenChange, person, onDelete }: { open: boolean; onOpenChange: (o: boolean) => void; person: Person | null; onDelete?: (p: Person) => Promise<boolean> }) {
   const toast = useToast();
   const empty = (): Omit<Person, 'id' | 'created_at' | 'updated_at'> => ({ name: '', role: '', email: '', phone: '', institution_ids: [], active: true, notes: '' });
   const { d, set, err, setErr } = useDraft(open, () => person ? { ...person } : empty(), [person]);
@@ -34,7 +37,8 @@ function PersonDialog({ open, onOpenChange, person }: { open: boolean; onOpenCha
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={person ? 'Editar pessoa' : 'Nova pessoa'}
-      footer={<><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save}>Salvar</Button></>}>
+      footer={<>{person && onDelete && <Button variant="ghost" className="mr-auto text-danger hover:text-danger" onClick={async () => { if (await onDelete(person)) onOpenChange(false); }}><Trash2 size={15} />Excluir</Button>}
+        <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save}>Salvar</Button></>}>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="Nome" required value={d.name} onChange={(e) => set('name', e.target.value)} error={err.name} />
         <TextField label="Função" value={d.role} onChange={(e) => set('role', e.target.value)} />
@@ -154,37 +158,43 @@ export default function Equipes() {
   const ps = people.items.filter((p) => matches(p.institution_ids)).filter((p) => !q || `${p.name} ${p.role}`.toLowerCase().includes(q.toLowerCase()));
   const fs = feedbacks.items.filter((f) => matches(f.institution_id)).filter((f) => !q || (pById[f.person_id]?.name ?? '').toLowerCase().includes(q.toLowerCase())).sort((a, b) => b.date.localeCompare(a.date));
 
-  async function delP(p: Person) {
+  async function delP(p: Person): Promise<boolean> {
     const n = feedbacks.items.filter((f) => f.person_id === p.id);
-    if (!(await confirm({ title: 'Excluir pessoa', message: `Excluir “${p.name}”${n.length ? ` e ${n.length} feedback(s)` : ''}?`, danger: true, confirmLabel: 'Excluir' }))) return;
+    if (!(await confirm({ title: 'Excluir pessoa', message: `Excluir “${p.name}”${n.length ? ` e ${n.length} feedback(s)` : ''}?`, danger: true, confirmLabel: 'Excluir' }))) return false;
     for (const f of n) await actions.remove('feedbacks', f.id);
     await actions.remove('people', p.id); toast('Pessoa excluída.');
+    return true;
   }
   async function delF(f: Feedback) { if (await confirm({ title: 'Excluir feedback', message: 'Excluir este feedback?', danger: true, confirmLabel: 'Excluir' })) await actions.remove('feedbacks', f.id); }
 
   return (
     <div>
-      <PageHeader title="Equipes e Feedbacks" subtitle={`${ps.length} pessoa(s)`}
+      <PageHeader title="Equipes e Feedbacks" subtitle={`${ps.length} ${ps.length === 1 ? 'pessoa' : 'pessoas'}`}
         actions={<><Segmented label="Seção" value={tab} onChange={setTab} options={[{ value: 'pessoas', label: 'Pessoas' }, { value: 'numeros', label: 'Números' }, { value: 'feedbacks', label: 'Feedbacks' }]} />
           {tab === 'pessoas' ? <Button onClick={() => setNewP(true)}><UserPlus size={16} />Pessoa</Button> : tab === 'feedbacks' && !restricted && <Button onClick={() => setNewF('')}><MessageSquarePlus size={16} />Feedback</Button>}</>} />
       <SearchInput id="busca-eq" className="mb-3 max-w-md" placeholder="Buscar por nome…" value={q} onChange={setQ} />
       {people.error ? <ErrorState message={people.error} onRetry={people.reload} /> : people.loading ? <Loading /> : tab === 'numeros' ? <MetricsTab q={q} /> : tab === 'pessoas' ? (
         ps.length === 0 ? <EmptyState title="Nenhuma pessoa" description="Cadastre a equipe comercial e vincule cada pessoa às instituições em que atua." action={<Button onClick={() => setNewP(true)}><Plus size={16} />Pessoa</Button>} /> : (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {ps.map((p) => (
-              <li key={p.id}><Card className="flex h-full flex-col gap-2 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div><div className="font-semibold">{p.name} {p.is_demo && <DemoBadge />}</div><div className="text-xs text-muted">{p.role || 'Função não informada'}{!p.active && ' · inativo'}</div></div>
-                  <div className="flex"><Button variant="ghost" size="icon" aria-label={`Editar ${p.name}`} onClick={() => setEditP(p)}><Pencil size={15} /></Button><Button variant="ghost" size="icon" aria-label={`Excluir ${p.name}`} onClick={() => delP(p)}><Trash2 size={15} /></Button></div>
-                </div>
-                <div className="flex flex-wrap gap-1">{p.institution_ids.map((i) => <InstitutionBadge key={i} id={i} />)}</div>
-                {!restricted && <div className="mt-auto text-xs text-muted">{feedbacks.items.filter((f) => f.person_id === p.id).length} feedback(s)</div>}
-                <div className="mt-auto flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" asChild><Link to={`/equipes/${p.id}`} aria-label={`Números de ${p.name}`}><BarChart3 size={14} />Números</Link></Button>
-                  <Button variant="secondary" size="sm" onClick={() => { setTab('feedbacks'); if (!restricted) setNewF(p.id); }}><MessageSquarePlus size={14} />Dar feedback</Button>
-                </div>
-              </Card></li>
-            ))}
+          <ul className="grid gap-2 lg:grid-cols-2 [&>*]:min-w-0">
+            {ps.map((p) => {
+              const nf = feedbacks.items.filter((f) => f.person_id === p.id).length;
+              return (
+                <li key={p.id} className={cn('flex items-center gap-3 rounded-xl border border-border/70 bg-surface/60 px-3 py-2.5', !p.active && 'opacity-60')}>
+                  <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-3 text-sm font-semibold text-gold">{initials(p.name)}</span>
+                  <Link to={`/equipes/${p.id}`} aria-label={`Números de ${p.name}`} className="min-w-0 flex-1 hover:text-gold">
+                    <div className="truncate text-sm font-medium">{p.name}</div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                      <span>{p.role || 'Função não informada'}{!p.active && ' · inativa'}</span>
+                      {p.institution_ids.map((i) => <InstitutionBadge key={i} id={i} />)}
+                      {!restricted && nf > 0 && <span>{nf} {nf === 1 ? 'feedback' : 'feedbacks'}</span>}
+                      {p.is_demo && <DemoBadge />}
+                    </div>
+                  </Link>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label={`Dar feedback para ${p.name}`} title="Dar feedback" onClick={() => { setTab('feedbacks'); if (!restricted) setNewF(p.id); }}><MessageSquarePlus size={16} /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label={`Editar ${p.name}`} title="Editar" onClick={() => setEditP(p)}><Pencil size={15} /></Button>
+                </li>
+              );
+            })}
           </ul>
         )
       ) : restricted ? <PinGate onUnlock={() => { unlockedThisSession = true; setUnlocked(true); }} /> : feedbacks.loading ? <Loading /> : fs.length === 0 ? <EmptyState title="Nenhum feedback" action={<Button onClick={() => setNewF('')}><Plus size={16} />Feedback</Button>} /> : (
@@ -209,7 +219,7 @@ export default function Equipes() {
           ))}
         </ul>
       )}
-      <PersonDialog open={newP || !!editP} person={editP} onOpenChange={(o) => { if (!o) { setNewP(false); setEditP(null); } }} />
+      <PersonDialog open={newP || !!editP} person={editP} onDelete={delP} onOpenChange={(o) => { if (!o) { setNewP(false); setEditP(null); } }} />
       <FeedbackDialog open={newF !== null || !!editF} feedback={editF} personId={newF ?? undefined} onOpenChange={(o) => { if (!o) { setNewF(null); setEditF(null); } }} />
       {confirmNode}
     </div>

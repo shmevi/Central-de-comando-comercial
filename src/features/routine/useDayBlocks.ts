@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useCollection, actions } from '@/data/store';
 import { isWeekend } from '@/lib/time';
+import { useSettings } from '@/app/hooks';
+import { offDates } from './offDays';
 import type { RoutineBlock } from '@/domain/types';
 
 const generating = new Set<string>();
@@ -26,9 +28,12 @@ export function useDayBlocks(date: string, autoGenerate = false) {
   const blocks = useCollection('routine_blocks');
   const templates = useCollection('routine_templates');
   const day = useMemo(() => blocks.items.filter((b) => b.date === date).sort((a, b) => a.start.localeCompare(b.start)), [blocks.items, date]);
+  const { settings } = useSettings();
   const ready = blocks.loaded && templates.loaded;
+  // Dia que você esvaziou de propósito não é recriado sozinho (offDays).
+  const off = offDates(settings).has(date);
   useEffect(() => {
-    if (autoGenerate && ready && !blocks.error && day.length === 0 && !isWeekend(date)) materializeDay(date, templates.items);
-  }, [autoGenerate, ready, day.length, date, templates.items, blocks.error]);
-  return { day, blocks, templates, ready, generate: () => materializeDay(date, templates.items) };
+    if (autoGenerate && ready && !blocks.error && day.length === 0 && !isWeekend(date) && !off) materializeDay(date, templates.items);
+  }, [autoGenerate, ready, day.length, date, templates.items, blocks.error, off]);
+  return { day, blocks, templates, ready, off, generate: () => materializeDay(date, templates.items) };
 }

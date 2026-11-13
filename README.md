@@ -68,6 +68,8 @@ Nenhum projeto Supabase foi criado ou conectado por este repositório. Siga na o
    - `0006_tarefas_atribuicao.sql` — coluna `tasks.attribution` (ATRIBUIÇÃO 70% / 20% / 10% / OFF WORK, como no Notion). Só adiciona.
    - `0007_person_metrics.sql` — Feedback em números: tabela `person_metrics` (leads, matrículas e valor por pessoa × instituição ×
      mês, com RLS) e `feedbacks.metrics_snapshot` (números congelados no feedback). Só adiciona; pode ser reaplicada.
+   - `0008_rotina_dias_sem_blocos.sql` — coluna `settings.routine_off_dates` (dias marcados como "Dia de folga" na Rotina:
+     a rotina-base não é recriada sozinha). Só adiciona; pode ser reaplicada.
 3. **Fechar o cadastro público** — **Authentication → Sign In / Providers** → desligue **Allow new users to sign up**.
    Deixe **Email** ligado e **Confirm email** ligado.
 4. **Criar o seu usuário** — **Authentication → Users → Add user → Create new user**: e-mail, senha forte e marque
@@ -135,7 +137,7 @@ src/
   integrations/   Notion: contrato do adaptador, adaptador de demonstração, sincronização
   lib/            datas/fuso, jornada, conflitos, OKR, PIN, convite WhatsApp
   pages/          uma tela por módulo
-supabase/         migrations 0001–0007 (esquema, Notion, relatórios/logo, vínculo Notion, atribuição, números da equipe + RLS e Storage), Edge Function notion-sync e testes de RLS
+supabase/         migrations 0001–0008 (esquema, Notion, relatórios/logo, vínculo Notion, atribuição, números da equipe, dias sem rotina + RLS e Storage), Edge Function notion-sync e testes de RLS
 e2e/              testes no navegador e servidor que imita a hospedagem
 scripts/          gerador de vercel.json / netlify.toml
 docs/             arquitetura, checklist de testes, status funcional

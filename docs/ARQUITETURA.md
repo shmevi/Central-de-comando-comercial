@@ -41,6 +41,19 @@
   otimizada uma vez em segundo plano (a original fica no Storage). A imagem fica em cache no navegador
   (`ccc:logo-cache:<caminho>`), então não é baixada a cada abertura; o ícone do atalho é gerado quando o navegador está ocioso.
 
+## Busca em tudo
+
+`src/features/search/`: `searchIndex.ts` (puro e testado: sem acento, todas as palavras, título primeiro, 5 por grupo) e
+`GlobalSearch.tsx` (lupa no topo e Ctrl+K). Lê as coleções só quando a busca abre, respeita a instituição do topo e
+abre o item por link: `/tarefas?tarefa=`, `/reunioes?reuniao=`, `/agenda?data=`, `/okrs?objetivo=`, `/equipes/<id>`.
+
+## Rotina: folga e intervalo
+
+- `features/routine/offDays.ts`: dias apagados de propósito ("Dia de folga") ficam em `settings.routine_off_dates`
+  (migration 0008; até 60 dias). Antes da 0008 no banco, a marca fica só no navegador — nada quebra.
+- `features/routine/templateBreak.ts`: salvar a Jornada move o bloco "Intervalo" do modelo de rotina e avisa se ele
+  passar a encostar em outro bloco (sem mexer nos outros). No editor do modelo, o horário do intervalo fica travado.
+
 ## Stack
 
 React 18 + TypeScript + Vite · Tailwind CSS · componentes no padrão shadcn/ui (Radix Dialog/Slot + CVA) ·
@@ -67,7 +80,7 @@ Lucide · Recharts · jsPDF (PDF) · Supabase JS · fontes Inter e Barlow Conden
 ## Modelo de dados
 
 Todas as tabelas têm `id`, `user_id`, `created_at`, `updated_at`, `is_demo`, `external_ref`.
-Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/` (0001 base, 0002 Notion, 0003 relatórios/logo, 0004 logo 5 MB, 0005 vínculo Notion, 0006 atribuição, 0007 números da equipe).
+Tipos completos em `src/domain/types.ts`; DDL em `supabase/migrations/` (0001 base, 0002 Notion, 0003 relatórios/logo, 0004 logo 5 MB, 0005 vínculo Notion, 0006 atribuição, 0007 números da equipe, 0008 dias sem rotina — `settings.routine_off_dates`).
 
 > **Recrutamento** e **Sistemas e Melhorias** foram retirados da interface (menu, rotas e telas). As tabelas
 > `candidates`, `interviews`, `systems` e `improvements` **continuam no banco com os dados intactos** e entram no backup.

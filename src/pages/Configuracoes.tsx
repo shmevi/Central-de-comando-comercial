@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, ImagePlus, Plus, Trash2, Upload } from 'lucide-react';
 import { actions, useCollection, resetStore } from '@/data/store';
 import { useInstitutions, useSettings } from '@/app/hooks';
@@ -19,6 +20,8 @@ import { hashPin } from '@/lib/pin';
 import { download } from '@/features/reports/build';
 import { LOGO_ACCEPT, LOGO_MAX_BYTES, LOGO_MAX_BYTES_LOCAL, fmtLimit, removeLogoFile, uploadLogo } from '@/data/branding';
 import { BrandLogo, useBrandLogo } from '@/components/layout/BrandLogo';
+import { PillTabs } from '@/components/ui/pill-tabs';
+import { retimeBreak } from '@/features/routine/templateBreak';
 
 function Section({ title, children, description }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -121,12 +124,12 @@ function RoutineTemplateEditor() {
     toast('Modelo salvo. Vale para os próximos dias gerados.');
   }
   return (
-    <Section title="Modelo de rotina" description="Rotina-base usada para gerar cada dia útil. Dias já gerados não mudam.">
+    <Section title="Modelo de rotina" description="Rotina-base usada para gerar cada dia útil. Dias já gerados não mudam. O horário do intervalo segue a Jornada.">
       <ul className="space-y-2">
         {blocks.map((b) => (
           <li key={b.id} className="grid grid-cols-[90px_90px_1fr_auto] items-center gap-2">
-            <label><span className="sr-only">Início</span><input type="time" className="field px-2" value={b.start} onChange={(e) => set(b.id, { start: e.target.value })} /></label>
-            <label><span className="sr-only">Fim</span><input type="time" className="field px-2" value={b.end} onChange={(e) => set(b.id, { end: e.target.value })} /></label>
+            <label><span className="sr-only">Início</span><input type="time" className="field px-2" value={b.start} disabled={b.is_break} title={b.is_break ? 'O intervalo segue a Jornada' : undefined} onChange={(e) => set(b.id, { start: e.target.value })} /></label>
+            <label><span className="sr-only">Fim</span><input type="time" className="field px-2" value={b.end} disabled={b.is_break} title={b.is_break ? 'O intervalo segue a Jornada' : undefined} onChange={(e) => set(b.id, { end: e.target.value })} /></label>
             <label><span className="sr-only">Título</span><input className="field" value={b.title} disabled={b.is_break} onChange={(e) => set(b.id, { title: e.target.value })} /></label>
             <Button variant="ghost" size="icon" disabled={b.is_break} aria-label={`Remover ${b.title}`} onClick={() => setBlocks(blocks.filter((x) => x.id !== b.id))}><Trash2 size={14} /></Button>
           </li>
@@ -167,6 +170,7 @@ function PinField() {
 
 function WorkdaySection() {
   const { settings, save } = useSettings();
+  const templates = useCollection('routine_templates');
   const toast = useToast();
   const [w, setW] = React.useState({ start: settings.workday_start, end: settings.workday_end, break_start: settings.break_start, break_end: settings.break_end });
   React.useEffect(() => { setW({ start: settings.workday_start, end: settings.workday_end, break_start: settings.break_start, break_end: settings.break_end }); }, [settings.workday_start, settings.workday_end, settings.break_start, settings.break_end]);
@@ -175,8 +179,14 @@ function WorkdaySection() {
   const dirty = w.start !== settings.workday_start || w.end !== settings.workday_end || w.break_start !== settings.break_start || w.break_end !== settings.break_end;
   async function submit(e: React.FormEvent) {
     e.preventDefault(); if (error) return;
-    try { await save({ workday_start: w.start, workday_end: w.end, break_start: w.break_start, break_end: w.break_end, daily_minutes: eff!, weekly_minutes: eff! * 5 }); toast('Jornada salva.'); }
-    catch (er) { toast((er as Error).message, 'erro'); }
+    try {
+      await save({ workday_start: w.start, workday_end: w.end, break_start: w.break_start, break_end: w.break_end, daily_minutes: eff!, weekly_minutes: eff! * 5 });
+      // O bloco "Intervalo" do modelo de rotina acompanha o novo intervalo (próximos dias gerados).
+      const { updates, clashes } = retimeBreak(templates.items, w.break_start, w.break_end);
+      for (const u of updates) await actions.update('routine_templates', u.id, { blocks: u.blocks });
+      if (clashes.length) toast(`Jornada salva. O intervalo do modelo de rotina mudou e agora encosta em: ${clashes.join(', ')}. Ajuste esses blocos em "Modelo de rotina".`, 'info');
+      else toast(updates.length ? 'Jornada salva. O intervalo do modelo de rotina foi atualizado junto.' : 'Jornada salva.');
+    } catch (er) { toast((er as Error).message, 'erro'); }
   }
   return (
     <Section title="Jornada" description="Segunda a sexta. Sem expediente aos sábados e domingos.">
@@ -190,7 +200,7 @@ function WorkdaySection() {
         {error ? <p role="alert" className="text-sm text-danger">{error}</p> : (
           <p className="text-sm">Carga efetiva: <strong className="text-gold">{fmtDuration(eff!)}</strong> por dia ({eff} min) · <strong className="text-gold">{fmtDuration(eff! * 5)}</strong> por semana{eff !== 528 && <span className="text-orange"> — difere do padrão 8h48</span>}</p>
         )}
-        <p className="text-xs text-muted">O bloco de intervalo do modelo de rotina não muda sozinho: ajuste-o em “Modelo de rotina” se mudar o intervalo.</p>
+        <p className="text-xs text-muted">Ao salvar, o bloco “Intervalo” do modelo de rotina muda junto (vale para os próximos dias gerados).</p>
         <Button type="submit" size="sm" disabled={!!error || !dirty}>Salvar jornada</Button>
       </form>
     </Section>
@@ -199,8 +209,16 @@ function WorkdaySection() {
 
 const OPTIONAL_COLLECTIONS: string[] = ['notion_sync_state', 'person_metrics'];
 
+const TABS = [{ value: 'geral', label: 'Geral' }, { value: 'jornada', label: 'Jornada' }, { value: 'organizacao', label: 'Organização' }, { value: 'dados', label: 'Dados' }] as const;
+type Tab = (typeof TABS)[number]['value'];
+const isTab = (v: string | null): v is Tab => TABS.some((t) => t.value === v);
+
 export default function Configuracoes() {
   const { settings, save } = useSettings();
+  const [params, setParams] = useSearchParams();
+  const rawTab = params.get('aba');
+  const tab: Tab = isTab(rawTab) ? rawTab : 'geral';
+  const setTab = (t: Tab) => { const n = new URLSearchParams(params); if (t === 'geral') n.delete('aba'); else n.set('aba', t); setParams(n, { replace: true }); };
   const { email, mode } = useAuth();
   const toast = useToast();
   const { confirm, confirmNode } = useConfirm();
@@ -247,27 +265,35 @@ export default function Configuracoes() {
     } catch (e) { toast((e as Error).message, 'erro'); }
   }
 
+  const grid = 'grid gap-6 lg:grid-cols-2 [&>*]:min-w-0';
   return (
     <div>
       <PageHeader title="Configurações" eyebrow="Sistema" />
-      <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+      <PillTabs label="Seções das configurações" value={tab} onChange={setTab} options={TABS} />
+      {tab === 'geral' && (
+      <div className={grid}>
         <LogoSection />
         <Section title="Perfil e aparência">
           <TextField label="Como devo chamar você?" defaultValue={settings.display_name} onBlur={(e) => e.target.value.trim() && save({ display_name: e.target.value.trim() })} />
           <div><span className="label">Tema</span>
             <Segmented label="Tema" value={settings.theme} onChange={(v) => save({ theme: v })} options={[{ value: 'dark', label: 'Escuro' }, { value: 'light', label: 'Claro' }, { value: 'system', label: 'Sistema' }]} /></div>
         </Section>
-
+      </div>
+      )}
+      {tab === 'jornada' && (
+      <div className={grid}>
         <WorkdaySection />
-
-        <Institutions />
-
         <Section title="Foco por dia da semana">
           {[1, 2, 3, 4, 5].map((d) => (
             <TextField key={d} label={WEEKDAYS[d]} defaultValue={settings.weekly_focus[String(d)] ?? ''} onBlur={(e) => save({ weekly_focus: { ...settings.weekly_focus, [String(d)]: e.target.value } })} />
           ))}
         </Section>
-
+        <RoutineTemplateEditor />
+      </div>
+      )}
+      {tab === 'organizacao' && (
+      <div className={grid}>
+        <Institutions />
         <Section title="Categorias">
           <ul className="flex flex-wrap gap-2">{settings.categories.map((c) => (
             <li key={c} className="chip border-border">{c}<button type="button" aria-label={`Remover categoria ${c}`} className="ml-1 text-muted hover:text-danger" onClick={() => save({ categories: settings.categories.filter((x) => x !== c) })}>×</button></li>
@@ -277,15 +303,15 @@ export default function Configuracoes() {
             <Button type="submit" variant="secondary"><Plus size={16} /></Button>
           </form>
         </Section>
-
-        <RoutineTemplateEditor />
-
+      </div>
+      )}
+      {tab === 'dados' && (
+      <div className={grid}>
         <Section title="Usuários e permissões" description="Cada usuário só acessa os próprios dados (RLS no Supabase).">
           <p className="text-sm">Modo de persistência: <strong>{mode === 'supabase' ? 'Supabase (autenticado)' : 'Local — somente neste navegador'}</strong>{email && <> · {email}</>}</p>
           <Checkbox label="Restringir acesso aos feedbacks" checked={settings.permissions.feedbacks_restricted} onChange={(v) => save({ permissions: { ...settings.permissions, feedbacks_restricted: v } })} />
           <PinField />
         </Section>
-
         <Section title="Dados" description="Dados de demonstração são marcados e podem ser removidos a qualquer momento.">
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={async () => { await seedDemo(); toast('Dados de demonstração adicionados.'); }}>Carregar demonstração</Button>
@@ -302,6 +328,7 @@ export default function Configuracoes() {
           <SelectField label="Fuso horário" value="America/Recife" disabled onChange={() => {}} options={[{ value: 'America/Recife', label: 'America/Recife (UTC−3)' }]} />
         </Section>
       </div>
+      )}
       {confirmNode}
     </div>
   );

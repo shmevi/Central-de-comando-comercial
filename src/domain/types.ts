@@ -369,6 +369,8 @@ export interface Settings extends BaseEntity {
   /** Logo personalizada: caminho no Storage (bucket "branding") ou data URL no modo local. null = monograma CP. */
   logo_path?: string | null;
   permissions: { feedbacks_restricted: boolean; feedback_pin: string };
+  /** Dias (yyyy-mm-dd) em que a rotina foi apagada de propósito: não é recriada sozinha (migration 0008). */
+  routine_off_dates?: string[];
 }
 
 export interface EntityMap {

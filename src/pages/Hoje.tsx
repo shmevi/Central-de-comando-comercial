@@ -118,7 +118,7 @@ export default function Hoje() {
   const { settings, workday } = useSettings();
   const { matchesItem } = useScope();
   const tasks = useCollection('tasks');
-  const { day } = useDayBlocks(now.date, true);
+  const { day, off } = useDayBlocks(now.date, true);
   const toast = useToast();
   const [editing, setEditing] = React.useState<Task | null>(null);
   const [creating, setCreating] = React.useState(false);
@@ -152,8 +152,8 @@ export default function Hoje() {
           <h1 className="brand-title mt-1.5 text-[26px] leading-none sm:text-[34px]">{greeting(now.time)}, <span className="text-gold">{settings.display_name}</span></h1>
           {focus && <p className="mt-2 text-sm text-muted">Foco do dia: <strong className="font-semibold text-fg">{focus}</strong></p>}
 
-          <p className="mt-4 text-sm text-muted">{nowLine(status, current, workday.start)}</p>
-          {status !== 'sem_expediente' && (
+          <p className="mt-4 text-sm text-muted">{off && day.length === 0 ? 'Dia de folga — sem rotina hoje.' : nowLine(status, current, workday.start)}</p>
+          {status !== 'sem_expediente' && !(off && day.length === 0) && (
             <div className="mt-2 flex items-center gap-3">
               <Progress value={pct} label="Progresso da jornada" className="h-1.5" />
               <span className="shrink-0 text-xs tabular-nums text-muted">{fmtDuration(worked)} de {fmtDuration(total)}</span>

@@ -19,6 +19,7 @@ $P -f "$ROOT/supabase/tests/notion_sync_test.sql"
 $P -f "$ROOT/supabase/tests/report_logo_test.sql"
 $P -f "$ROOT/supabase/tests/notion_access_test.sql"
 $P -f "$ROOT/supabase/tests/person_metrics_test.sql"
+$P -f "$ROOT/supabase/tests/rotina_off_test.sql"
 # A 0002 precisa poder ser reaplicada num banco de teste sem erro
 $P -f "$ROOT/supabase/migrations/0002_notion_sync.sql"
 # A 0003 também (não destrutiva, idempotente)
@@ -28,3 +29,5 @@ $P -f "$ROOT/supabase/migrations/0005_notion_access.sql"
 $P -f "$ROOT/supabase/migrations/0006_tarefas_atribuicao.sql"
 # A 0007 pode ser reaplicada sem erro
 $P -f "$ROOT/supabase/migrations/0007_person_metrics.sql"
+# A 0008 pode ser reaplicada sem erro
+$P -f "$ROOT/supabase/migrations/0008_rotina_dias_sem_blocos.sql"

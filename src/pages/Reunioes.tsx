@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ClipboardPlus, ListPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { actions, useCollection } from '@/data/store';
 import { useScope } from '@/app/scope';
@@ -94,6 +95,15 @@ export default function Reunioes() {
   const toast = useToast();
   const [q, setQ] = React.useState('');
   const [editing, setEditing] = React.useState<Meeting | null>(null); const [creating, setCreating] = React.useState(false);
+  // Vindo da busca global: /reunioes?reuniao=<id> abre a reunião
+  const [params, setParams] = useSearchParams();
+  const openId = params.get('reuniao');
+  React.useEffect(() => {
+    if (!openId || !meetings.loaded) return;
+    const m = meetings.items.find((x) => x.id === openId);
+    if (m) setEditing(m);
+    const n = new URLSearchParams(params); n.delete('reuniao'); setParams(n, { replace: true });
+  }, [openId, meetings.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const list = meetings.items.filter((m) => matches(m.institution_id)).filter((m) => !q || `${m.title} ${m.agenda} ${m.decisions}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start));
   const pending = list.flatMap((m) => m.actions.filter((a) => !a.done).map((a) => ({ ...a, meeting: m })));
 

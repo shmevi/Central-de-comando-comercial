@@ -13,6 +13,7 @@ import { useInstitutions, useSettings } from '@/app/hooks';
 import { useAuth } from '@/app/auth';
 import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { GlobalSearch } from '@/features/search/GlobalSearch';
 import { Loading } from '@/components/ui/misc';
 
 function Brand() {
@@ -87,7 +88,7 @@ function ScopeSelect() {
   return (
     <label className="flex items-center gap-2 text-xs">
       <span className="sr-only font-medium text-muted sm:not-sr-only">Instituição</span>
-      <select value={scope} onChange={(e) => setScope(e.target.value)} className="field h-9 w-auto max-w-[9.5rem] py-1 pr-8 sm:max-w-none" aria-label="Filtrar por instituição">
+      <select value={scope} onChange={(e) => setScope(e.target.value)} className="field h-9 w-auto max-w-[8rem] py-1 pr-7 sm:max-w-none sm:pr-8" aria-label="Filtrar por instituição">
         <option value="all">Todas</option>
         {active.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
         <option value="none">Sem instituição</option>
@@ -161,7 +162,7 @@ export function AppShell() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1"><ScopeSelect /><ThemeToggle /></div>
+          <div className="flex items-center gap-1"><GlobalSearch /><ScopeSelect /><ThemeToggle /></div>
         </header>
         <main id="conteudo" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
           <ErrorBoundary resetKey={loc.pathname}>

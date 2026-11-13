@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, ListChecks, Plus, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, ListChecks, Plus, SlidersHorizontal } from 'lucide-react';
 import { useCollection, actions } from '@/data/store';
 import { useScope } from '@/app/scope';
 import { useSettings } from '@/app/hooks';
@@ -12,6 +12,7 @@ import { TASK_STATUS_NOTION, TONE_RGB, attributionTone, toneChip } from '@/featu
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/form';
 import { SearchInput } from '@/components/ui/search';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { KanbanBoard } from '@/components/ui/kanban';
 import { useToast } from '@/components/ui/toast';
 import { TaskRow, PRIORITY_TONE } from '@/features/tasks/TaskRow';
@@ -68,16 +69,6 @@ function KanbanTaskCard({ t, onOpen, showAttribution, showStatus }: { t: Task; o
   );
 }
 
-/** Filtro ligado, com "x" para tirar. */
-function FilterChip({ children, onClear }: { children: React.ReactNode; onClear: () => void }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-gold-300/40 bg-gold-300/[.08] py-0.5 pl-2.5 pr-1 text-xs text-fg">
-      {children}
-      <button type="button" onClick={onClear} className="grid h-5 w-5 place-items-center rounded-full text-muted hover:bg-surface-3 hover:text-fg" aria-label={`Remover filtro: ${typeof children === 'string' ? children : ''}`}><X size={12} /></button>
-    </span>
-  );
-}
-
 export default function Tarefas() {
   const tasks = useCollection('tasks');
   const { scope, matchesItem } = useScope();
@@ -104,6 +95,14 @@ export default function Tarefas() {
   const [creating, setCreating] = React.useState(false);
   const toast = useToast();
   const today = todayISO();
+  // Vindo da busca global: /tarefas?tarefa=<id> abre a tarefa
+  const openId = params.get('tarefa');
+  React.useEffect(() => {
+    if (!openId || !tasks.loaded) return;
+    const t = tasks.items.find((x) => x.id === openId);
+    if (t) setEditing(t);
+    const n = new URLSearchParams(params); n.delete('tarefa'); setParams(n, { replace: true });
+  }, [openId, tasks.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Atualiza um parâmetro da URL preservando os outros (aba e origem convivem). */
   const setParam = (key: string, v: string) => {

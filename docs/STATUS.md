@@ -36,6 +36,9 @@
 - **Quadros iguais aos do Notion**: OKRs em "Kanban por Objetivo" (colunas = Objetivos, só KRs ativos, status no cartão)
   e Tarefas agrupadas por ATRIBUIÇÃO (70% / 20% / 10% / OFF WORK, só ativas) ou por status com os nomes do Notion.
 
+- **Busca em tudo** (lupa no topo ou Ctrl+K): tarefas, pessoas, reuniões, agenda, OKRs, projetos, treinamentos e anotações, na instituição escolhida; abre o item encontrado. Feedbacks ficam de fora (podem ter PIN).
+- **Telas enxutas**: Rotina (uma linha por bloco, círculo para concluir, menu "⋯"), Agenda (semana em lista no celular; excluir dentro do evento), OKRs (filtros recolhidos, cartão menor, abas no celular), Equipes (uma linha por pessoa; excluir dentro da pessoa) e Configurações em abas (Geral, Jornada, Organização, Dados).
+- **Rotina**: "Dia de folga" apaga o dia e a tela Hoje não recria a rotina-base (migration 0008); mudar o intervalo na Jornada move o bloco "Intervalo" do modelo de rotina junto.
 - **Tarefas organizadas por prazo**: abas Todas / Hoje / Atrasadas / Próximos 7 dias; lista agrupada (atrasadas, hoje, amanhã, 7 dias, depois, sem prazo; concluídas recolhidas); busca + filtros recolhidos com etiquetas removíveis; adicionar rápido (Enter); concluir com "Desfazer"; excluir dentro da tarefa; Kanban com abas no celular e menu "⋯" para mover.
 - **Tela Hoje enxuta**: o que fazer agora, números que importam, Missão do dia, próximos itens e anotação rápida.
 - **Desempenho**: abertura em uma onda de pedidos, telas pré-carregadas ao passar o mouse/tocar no menu, ações com
@@ -53,11 +56,9 @@
   por força bruta); a proteção real é login + RLS. Perfis com papéis diferentes
   (ex.: supervisor que lê só a própria equipe) exigem tabela de membros/papéis — ainda não modelado.
 - Multiusuário compartilhando os mesmos dados (equipe) não está modelado: cada usuário tem seu próprio espaço.
-- Se você apagar todos os blocos de rotina de hoje, a tela Hoje gera a rotina-base de novo ao abrir.
-- Mudar o horário do intervalo em Configurações não altera o bloco "Intervalo" do modelo de rotina: ajuste os dois.
 - Cada pessoa que entra tem o próprio espaço de dados. Não há tela para administrar usuários dentro do app:
   usuários são criados e removidos no painel do Supabase (Authentication → Users).
-- Arrastar e soltar nos Kanbans usa HTML5 drag (desktop); no celular e por teclado use o seletor "Mover".
+- Arrastar e soltar nos Kanbans usa HTML5 drag (desktop); no celular e por teclado use o menu "⋯" do cartão.
 - Notion: criar páginas novas (tarefa ou KR criados na Central) e mudar o Objetivo de um KR ainda não são enviados.
   A fórmula `Progresso` só é convertida para 0–100 quando confere com Meta/Atual; senão o progresso é calculado na Central.
 - O log de sincronização mostra os 300 registros mais recentes (a exportação em Configurações leva todos).
