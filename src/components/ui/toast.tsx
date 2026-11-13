@@ -6,9 +6,6 @@ export type ToastAction = { label: string; onClick: () => void };
 type Toast = { id: number; message: string; kind: 'ok' | 'erro' | 'info'; action?: ToastAction };
 const Ctx = React.createContext<(m: string, k?: Toast['kind'], action?: ToastAction) => void>(() => {});
 export const useToast = () => React.useContext(Ctx);
-const CountCtx = React.createContext(0);
-/** Quantos avisos estão na tela (ex.: esconder o botão flutuante para não ficar atrás do aviso). */
-export const useToastCount = () => React.useContext(CountCtx);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = React.useState<Toast[]>([]);
@@ -29,7 +26,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [push]);
   return (
     <Ctx.Provider value={push}>
-      <CountCtx.Provider value={items.length}>{children}</CountCtx.Provider>
+      {children}
       <div aria-live="polite" className="pointer-events-none fixed bottom-20 left-1/2 z-[60] flex w-[calc(100vw-32px)] max-w-sm -translate-x-1/2 flex-col gap-2 lg:bottom-4">
         {items.map((t) => (
           <div key={t.id} role={t.kind === 'erro' ? 'alert' : 'status'} className={cn('card pointer-events-auto animate-slide-up border-l-[3px] bg-surface-2 px-4 py-3 text-sm shadow-elev-2', t.kind === 'erro' ? 'border-l-danger' : t.kind === 'ok' ? 'border-l-success' : 'border-l-info')}>

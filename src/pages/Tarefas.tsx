@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/form';
 import { SearchInput } from '@/components/ui/search';
 import { KanbanBoard } from '@/components/ui/kanban';
-import { useToast, useToastCount } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/toast';
 import { TaskRow, PRIORITY_TONE } from '@/features/tasks/TaskRow';
 import { TaskDialog } from '@/features/tasks/TaskDialog';
 import { PushBanner } from '@/features/notion/PushPanel';
@@ -103,7 +103,6 @@ export default function Tarefas() {
   const [editing, setEditing] = React.useState<Task | null>(null);
   const [creating, setCreating] = React.useState(false);
   const toast = useToast();
-  const toastsOnScreen = useToastCount();
   const today = todayISO();
 
   /** Atualiza um parâmetro da URL preservando os outros (aba e origem convivem). */
@@ -182,11 +181,11 @@ export default function Tarefas() {
   const showHeaders = groups.length > 1 || tab === '';
 
   return (
-    <div className="pb-20 sm:pb-0">
+    <div>
       <PageHeader title="Tarefas" eyebrow="Dia a dia" subtitle={<>{openCount} {openCount === 1 ? 'aberta' : 'abertas'}{lateCount > 0 && <> · <span className="text-danger">{lateCount} {lateCount === 1 ? 'atrasada' : 'atrasadas'}</span></>}</>}
         actions={<><Segmented label="Visualização" value={view} onChange={setView} options={[{ value: 'lista', label: 'Lista' }, { value: 'kanban', label: 'Kanban' }]} />
           {view === 'kanban' && <Segmented label="Agrupar Kanban por" value={groupBy} onChange={setGroupBy} options={[{ value: 'atribuicao', label: 'Atribuição' }, { value: 'status', label: 'Status' }]} />}
-          <Button className="hidden sm:inline-flex" onClick={() => setCreating(true)}><Plus size={16} />Nova tarefa</Button></>} />
+          <Button onClick={() => setCreating(true)}><Plus size={16} />Nova tarefa</Button></>} />
 
       <PushBanner entity="tarefas" />
 
@@ -285,11 +284,6 @@ export default function Tarefas() {
             renderCard={(t) => <KanbanTaskCard t={t} onOpen={setEditing} showAttribution />} />
         )}
 
-      {/* Celular: botão flutuante para criar tarefa de qualquer ponto da lista */}
-      <button type="button" aria-label="Criar tarefa" onClick={() => setCreating(true)}
-        className={cn('fixed bottom-24 right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gold-gradient text-[rgb(var(--bg))] shadow-elev-2 transition active:scale-95 sm:hidden', toastsOnScreen > 0 && 'pointer-events-none scale-75 opacity-0')}>
-        <Plus size={24} />
-      </button>
       <TaskDialog open={creating || !!editing} task={editing} onOpenChange={(o) => { if (!o) { setEditing(null); setCreating(false); } }} />
     </div>
   );
